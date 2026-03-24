@@ -26,6 +26,7 @@ import (
 	"github.com/knadh/listmonk/internal/media"
 	"github.com/knadh/listmonk/internal/messenger/email"
 	"github.com/knadh/listmonk/internal/subimporter"
+	"github.com/knadh/listmonk/internal/webhooks"
 	"github.com/knadh/listmonk/models"
 	"github.com/knadh/paginator"
 	"github.com/knadh/stuffbin"
@@ -46,7 +47,9 @@ type App struct {
 	auth       *auth.Auth
 	media      media.Store
 	bounce     *bounce.Manager
-	captcha    *captcha.Captcha
+	webhookMgr    *webhooks.Manager
+	dripProcessor *manager.DripProcessor
+	captcha       *captcha.Captcha
 	i18n       *i18n.I18n
 	pg         *paginator.Paginator
 	events     *events.Events
@@ -254,12 +257,22 @@ func main() {
 		go bounce.Run()
 	}
 
+	// Initialize the webhook manager.
+	webhookMgr := webhooks.New(core, lo)
+
 	// Start cronjobs.
 	initCron(core, db)
 
 	// Start the campaign manager workers. The campaign batches (fetch from DB, push out
 	// messages) get processed at the specified interval.
 	go mgr.Run()
+
+	// Start the drip campaign processor.
+	dripProcessor := manager.NewDripProcessor(core, mgr, lo, manager.DripConfig{
+		BatchSize: 100,
+		Interval:  30 * time.Second,
+	})
+	go dripProcessor.Run()
 
 	// =========================================================================
 	// Initialize the App{} with all the global shared components, controllers and fields.
@@ -277,7 +290,9 @@ func main() {
 		auth:       auth,
 		media:      media,
 		bounce:     bounce,
-		captcha:    initCaptcha(),
+		webhookMgr:    webhookMgr,
+		dripProcessor: dripProcessor,
+		captcha:       initCaptcha(),
 		i18n:       i18n,
 		log:        lo,
 		events:     evStream,
@@ -320,6 +335,12 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		srv.Shutdown(ctx)
+
+		// Close the drip processor.
+		dripProcessor.Close()
+
+		// Close the webhook manager.
+		webhookMgr.Close()
 
 		// Close the campaign manager.
 		mgr.Close()

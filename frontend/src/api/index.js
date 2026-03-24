@@ -113,6 +113,11 @@ export const getDashboardCharts = () => http.get(
   { loading: models.dashboard },
 );
 
+export const getDashboardFeatureCounts = () => http.get(
+  '/api/dashboard/features',
+  { loading: models.dashboard },
+);
+
 // Lists.
 export const getLists = (params) => http.get(
   '/api/lists',
@@ -574,3 +579,80 @@ export const disableTOTP = (id, data) => http.delete(
   `/api/users/${id}/twofa`,
   { data },
 );
+
+// =====================================================
+// Solomon Platform Extensions
+// =====================================================
+
+// Segments.
+export const getSegments = async (params) => http.get('/api/segments', { params });
+export const getSegment = async (id) => http.get(`/api/segments/${id}`);
+export const createSegment = (data) => http.post('/api/segments', data);
+export const updateSegment = (id, data) => http.put(`/api/segments/${id}`, data);
+export const deleteSegment = (id) => http.delete(`/api/segments/${id}`);
+export const getSegmentCount = async (id) => http.get(`/api/segments/${id}/count`);
+export const getSegmentSubscribers = async (id, params) => http.get(`/api/segments/${id}/subscribers`, { params });
+
+// Webhooks.
+export const getWebhooks = async (params) => http.get('/api/webhooks', { params });
+export const getWebhook = async (id) => http.get(`/api/webhooks/${id}`);
+export const createWebhook = (data) => http.post('/api/webhooks', data);
+export const updateWebhook = (id, data) => http.put(`/api/webhooks/${id}`, data);
+export const deleteWebhook = (id) => http.delete(`/api/webhooks/${id}`);
+export const getWebhookLog = async (id, params) => http.get(`/api/webhooks/${id}/log`, { params });
+export const testWebhook = (id) => http.post(`/api/webhooks/${id}/test`);
+
+// Drip campaigns.
+export const getDripCampaigns = async (params) => http.get('/api/drips', { params });
+export const getDripCampaign = async (id) => http.get(`/api/drips/${id}`);
+export const createDripCampaign = (data) => http.post('/api/drips', data);
+export const updateDripCampaign = (id, data) => http.put(`/api/drips/${id}`, data);
+export const updateDripCampaignStatus = (id, status) => http.put(`/api/drips/${id}/status`, { status });
+export const deleteDripCampaign = (id) => http.delete(`/api/drips/${id}`);
+export const getDripSteps = async (id) => http.get(`/api/drips/${id}/steps`);
+export const createDripStep = (id, data) => http.post(`/api/drips/${id}/steps`, data);
+export const updateDripStep = (id, stepId, data) => http.put(`/api/drips/${id}/steps/${stepId}`, data);
+export const deleteDripStep = (id, stepId) => http.delete(`/api/drips/${id}/steps/${stepId}`);
+export const getDripEnrollments = async (id, params) => http.get(`/api/drips/${id}/enrollments`, { params });
+export const enrollSubscriberInDrip = (id, subscriberId) => http.post(`/api/drips/${id}/enroll`, { subscriber_id: subscriberId });
+
+// A/B tests.
+export const getABTest = async (id) => http.get(`/api/ab-tests/${id}`);
+export const getABTestByCampaign = async (campaignId) => http.get(`/api/campaigns/${campaignId}/ab-test`);
+export const createABTest = (data) => http.post('/api/ab-tests', data);
+export const updateABTest = (id, data) => http.put(`/api/ab-tests/${id}`, data);
+export const deleteABTest = (id) => http.delete(`/api/ab-tests/${id}`);
+export const createABVariant = (testId, data) => http.post(`/api/ab-tests/${testId}/variants`, data);
+export const updateABVariant = (testId, variantId, data) => http.put(`/api/ab-tests/${testId}/variants/${variantId}`, data);
+export const deleteABVariant = (testId, variantId) => http.delete(`/api/ab-tests/${testId}/variants/${variantId}`);
+
+// Automations.
+export const getAutomations = async (params) => http.get('/api/automations', { params });
+export const getAutomation = async (id) => http.get(`/api/automations/${id}`);
+export const createAutomation = (data) => http.post('/api/automations', data);
+export const updateAutomation = (id, data) => http.put(`/api/automations/${id}`, data);
+export const deleteAutomation = (id) => http.delete(`/api/automations/${id}`);
+export const createAutomationNode = (id, data) => http.post(`/api/automations/${id}/nodes`, data);
+export const updateAutomationNode = (id, nodeId, data) => http.put(`/api/automations/${id}/nodes/${nodeId}`, data);
+export const deleteAutomationNode = (id, nodeId) => http.delete(`/api/automations/${id}/nodes/${nodeId}`);
+export const createAutomationEdge = (id, data) => http.post(`/api/automations/${id}/edges`, data);
+export const deleteAutomationEdge = (id, edgeId) => http.delete(`/api/automations/${id}/edges/${edgeId}`);
+
+// Contact scoring.
+export const getScoringRules = async () => http.get('/api/scoring/rules');
+export const getScoringRule = async (id) => http.get(`/api/scoring/rules/${id}`);
+export const createScoringRule = (data) => http.post('/api/scoring/rules', data);
+export const updateScoringRule = (id, data) => http.put(`/api/scoring/rules/${id}`, data);
+export const deleteScoringRule = (id) => http.delete(`/api/scoring/rules/${id}`);
+export const getSubscriberScoreLog = async (id, params) => http.get(`/api/subscribers/${id}/score-log`, { params });
+
+// CRM: deals and activities.
+export const getDeals = async (params) => http.get('/api/deals', { params });
+export const getDeal = async (id) => http.get(`/api/deals/${id}`);
+export const createDeal = (data) => http.post('/api/deals', data);
+export const updateDeal = (id, data) => http.put(`/api/deals/${id}`, data);
+export const deleteDeal = (id) => http.delete(`/api/deals/${id}`);
+export const getDealPipeline = async () => http.get('/api/deals/pipeline');
+export const getSubscriberCRMActivities = async (id, params) => http.get(`/api/subscribers/${id}/activities`, { params });
+export const createContactActivity = (subscriberId, data) => http.post(`/api/subscribers/${subscriberId}/activities`, data);
+export const deleteContactActivity = (activityId) => http.delete(`/api/activities/${activityId}`);

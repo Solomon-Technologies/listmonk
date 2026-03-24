@@ -116,6 +116,108 @@
               </article><!-- subscribers -->
             </div>
           </div>
+          <div class="tile">
+            <div class="tile is-parent relative">
+              <b-loading v-if="isFeaturesLoading" active :is-full-page="false" />
+              <article class="tile is-child notification" data-cy="features-left">
+                <div class="columns is-mobile">
+                  <div class="column is-6">
+                    <p class="title">
+                      <b-icon icon="water-outline" />
+                      {{ features.drips ? features.drips.total : 0 }}
+                    </p>
+                    <p class="is-size-6 has-text-grey">Drip Campaigns</p>
+                  </div>
+                  <div class="column is-6">
+                    <ul class="no has-text-grey">
+                      <li>
+                        <label for="#">{{ features.drips ? features.drips.active : 0 }}</label>
+                        Active
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+                <hr />
+                <div class="columns is-mobile">
+                  <div class="column is-6">
+                    <p class="title">
+                      <b-icon icon="robot-outline" />
+                      {{ features.automations ? features.automations.total : 0 }}
+                    </p>
+                    <p class="is-size-6 has-text-grey">Automations</p>
+                  </div>
+                  <div class="column is-6">
+                    <ul class="no has-text-grey">
+                      <li>
+                        <label for="#">{{ features.automations ? features.automations.active : 0 }}</label>
+                        Active
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+                <hr />
+                <div class="columns is-mobile">
+                  <div class="column is-6">
+                    <p class="title">
+                      <b-icon icon="filter-variant" />
+                      {{ features.segments || 0 }}
+                    </p>
+                    <p class="is-size-6 has-text-grey">Segments</p>
+                  </div>
+                </div>
+              </article>
+            </div>
+            <div class="tile is-parent relative">
+              <b-loading v-if="isFeaturesLoading" active :is-full-page="false" />
+              <article class="tile is-child notification" data-cy="features-right">
+                <div class="columns is-mobile">
+                  <div class="column is-6">
+                    <p class="title">
+                      <b-icon icon="star-outline" />
+                      {{ features.scoring_rules || 0 }}
+                    </p>
+                    <p class="is-size-6 has-text-grey">Scoring Rules</p>
+                  </div>
+                </div>
+                <hr />
+                <div class="columns is-mobile">
+                  <div class="column is-6">
+                    <p class="title">
+                      <b-icon icon="handshake-outline" />
+                      {{ features.deals ? features.deals.total : 0 }}
+                    </p>
+                    <p class="is-size-6 has-text-grey">Deals</p>
+                  </div>
+                  <div class="column is-6">
+                    <ul class="no has-text-grey">
+                      <li>
+                        <label for="#">{{ features.deals ? features.deals.open : 0 }}</label>
+                        Open
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+                <hr />
+                <div class="columns is-mobile">
+                  <div class="column is-6">
+                    <p class="title">
+                      <b-icon icon="webhook" />
+                      {{ features.webhooks ? features.webhooks.total : 0 }}
+                    </p>
+                    <p class="is-size-6 has-text-grey">Webhooks</p>
+                  </div>
+                  <div class="column is-6">
+                    <ul class="no has-text-grey">
+                      <li>
+                        <label for="#">{{ features.webhooks ? features.webhooks.active : 0 }}</label>
+                        Active
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div><!-- features row -->
           <div class="tile is-parent relative">
             <b-loading v-if="isChartsLoading" active :is-full-page="false" />
             <article class="tile is-child notification charts">
@@ -164,6 +266,7 @@ export default Vue.extend({
     return {
       isChartsLoading: true,
       isCountsLoading: true,
+      isFeaturesLoading: true,
       campaignViews: null,
       campaignClicks: null,
       counts: {
@@ -172,6 +275,7 @@ export default Vue.extend({
         campaigns: {},
         messages: 0,
       },
+      features: {},
     };
   },
 
@@ -189,6 +293,12 @@ export default Vue.extend({
         this.isChartsLoading = false;
         this.campaignViews = this.makeChart(data.campaignViews);
         this.campaignClicks = this.makeChart(data.linkClicks);
+      });
+
+      this.isFeaturesLoading = true;
+      this.$api.getDashboardFeatureCounts().then((data) => {
+        this.features = data;
+        this.isFeaturesLoading = false;
       });
     },
 

@@ -1,0 +1,77 @@
+# Solomon Technologies — Multi-stage build for Listmonk fork
+# Usage: docker build -f Dockerfile.solomon -t solomon-listmonk:latest .
+
+# Stage 1: Build email-builder (React/MUI)
+FROM node:20-alpine AS email-builder
+WORKDIR /app/frontend/email-builder
+COPY frontend/email-builder/package.json frontend/email-builder/yarn.lock* ./
+RUN yarn install --frozen-lockfile || yarn install
+COPY frontend/email-builder/ ./
+RUN yarn build
+
+# Stage 2: Build main frontend (Vue.js)
+FROM node:20-alpine AS frontend
+WORKDIR /app/frontend
+
+# Copy email-builder dist first
+COPY --from=email-builder /app/frontend/email-builder/dist /app/frontend/email-builder-dist
+
+# Install and build main frontend
+# Create the directory that the postinstall script expects (copies altcha.umd.cjs)
+RUN mkdir -p /app/static/public/static
+COPY frontend/package.json frontend/yarn.lock* ./
+RUN yarn install --frozen-lockfile || yarn install
+# Also copy altcha to our known location
+RUN cp node_modules/altcha/dist/altcha.umd.cjs /app/static/public/static/altcha.umd.js || true
+
+COPY frontend/ ./
+
+# Copy email-builder dist into expected location
+RUN mkdir -p public/static/email-builder && \
+    cp -r /app/frontend/email-builder-dist/* public/static/email-builder/
+
+# Create .gitignore for eslint prebuild step (normally inherited from repo root)
+RUN echo "node_modules\ndist" > .gitignore
+RUN VUE_APP_VERSION="solomon" yarn build
+
+# Stage 3: Build Go binary
+FROM golang:1.26-alpine AS backend
+RUN apk add --no-cache make git
+RUN go install github.com/knadh/stuffbin/...@v1.3.0
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# Copy built frontend assets
+COPY --from=frontend /app/frontend/dist frontend/dist
+COPY --from=frontend /app/frontend/public/static/email-builder frontend/public/static/email-builder
+COPY --from=frontend /app/static/public/static/altcha.umd.js static/public/static/altcha.umd.js
+
+# Build the Go binary
+RUN CGO_ENABLED=0 go build -o listmonk -ldflags="-s -w -X 'main.buildString=solomon (#$(git rev-parse --short HEAD) $(date -u +%Y-%m-%dT%H:%M:%SZ))' -X 'main.versionString=solomon'" cmd/*.go
+
+# Stuff all static assets into the binary
+RUN $(go env GOPATH)/bin/stuffbin -a stuff -in listmonk -out listmonk \
+    config.toml.sample \
+    schema.sql \
+    queries:/queries \
+    permissions.json \
+    static/public:/public \
+    static/email-templates \
+    frontend/dist:/admin \
+    i18n:/i18n
+
+# Stage 4: Minimal runtime image
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates tzdata shadow su-exec
+WORKDIR /listmonk
+COPY --from=backend /app/listmonk .
+COPY config.toml.sample config.toml
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+EXPOSE 9000
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["./listmonk"]

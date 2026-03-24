@@ -137,6 +137,88 @@ const routes = [
     meta: { title: 'maintenance.title', group: 'settings' },
     component: () => import('../views/Maintenance.vue'),
   },
+
+  // Segments
+  {
+    path: '/segments',
+    name: 'segments',
+    meta: { title: 'Segments', group: 'segments' },
+    component: () => import('../views/Segments.vue'),
+  },
+
+  // Webhooks
+  {
+    path: '/webhooks',
+    name: 'webhooks',
+    meta: { title: 'Webhooks', group: 'webhooks' },
+    component: () => import('../views/Webhooks.vue'),
+  },
+  {
+    path: '/webhooks/:id/log',
+    name: 'webhookLog',
+    meta: { title: 'Webhook Log', group: 'webhooks' },
+    component: () => import('../views/WebhookLog.vue'),
+  },
+
+  // Drip Campaigns
+  {
+    path: '/drips',
+    name: 'drips',
+    meta: { title: 'Drip Campaigns', group: 'drips' },
+    component: () => import('../views/Drips.vue'),
+  },
+  {
+    path: '/drips/:id',
+    name: 'drip',
+    meta: { title: 'Drip Campaign', group: 'drips' },
+    component: () => import('../views/DripEditor.vue'),
+  },
+
+  // A/B Tests
+  {
+    path: '/ab-tests',
+    name: 'abTests',
+    meta: { title: 'A/B Tests', group: 'campaigns' },
+    component: () => import('../views/ABTests.vue'),
+  },
+
+  // Automations
+  {
+    path: '/automations',
+    name: 'automations',
+    meta: { title: 'Automations', group: 'automations' },
+    component: () => import('../views/Automations.vue'),
+  },
+  {
+    path: '/automations/:id',
+    name: 'automation',
+    meta: { title: 'Automation', group: 'automations' },
+    component: () => import('../views/AutomationEditor.vue'),
+  },
+
+  // Scoring
+  {
+    path: '/scoring',
+    name: 'scoring',
+    meta: { title: 'Contact Scoring', group: 'scoring' },
+    component: () => import('../views/Scoring.vue'),
+  },
+
+  // CRM - Deals
+  {
+    path: '/deals',
+    name: 'deals',
+    meta: { title: 'Deals', group: 'crm' },
+    component: () => import('../views/Deals.vue'),
+  },
+
+  // CRM - Activities
+  {
+    path: '/activities',
+    name: 'activities',
+    meta: { title: 'Activities', group: 'crm' },
+    component: () => import('../views/Activities.vue'),
+  },
 ];
 
 const router = new VueRouter({

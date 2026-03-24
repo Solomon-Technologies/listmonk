@@ -11,8 +11,9 @@ import (
 
 // Queries contains all prepared SQL queries.
 type Queries struct {
-	GetDashboardCharts *sqlx.Stmt `query:"get-dashboard-charts"`
-	GetDashboardCounts *sqlx.Stmt `query:"get-dashboard-counts"`
+	GetDashboardCharts      *sqlx.Stmt `query:"get-dashboard-charts"`
+	GetDashboardCounts      *sqlx.Stmt `query:"get-dashboard-counts"`
+	GetDashboardFeatureCounts *sqlx.Stmt `query:"get-dashboard-feature-counts"`
 
 	InsertSubscriber                *sqlx.Stmt `query:"insert-subscriber"`
 	UpsertSubscriber                *sqlx.Stmt `query:"upsert-subscriber"`
@@ -128,6 +129,111 @@ type Queries struct {
 	GetAPITokens       *sqlx.Stmt `query:"get-api-tokens"`
 	LoginUser          *sqlx.Stmt `query:"login-user"`
 	DeleteUserSessions *sqlx.Stmt `query:"delete-user-sessions"`
+
+	// Segments.
+	CreateSegment      *sqlx.Stmt `query:"create-segment"`
+	QuerySegments      string     `query:"query-segments"`
+	GetSegment         *sqlx.Stmt `query:"get-segment"`
+	UpdateSegment      *sqlx.Stmt `query:"update-segment"`
+	UpdateSegmentCount *sqlx.Stmt `query:"update-segment-count"`
+	DeleteSegment      *sqlx.Stmt `query:"delete-segment"`
+
+	// Drip campaigns.
+	CreateDripCampaign       *sqlx.Stmt `query:"create-drip-campaign"`
+	QueryDripCampaigns       string     `query:"query-drip-campaigns"`
+	GetDripCampaign          *sqlx.Stmt `query:"get-drip-campaign"`
+	UpdateDripCampaign       *sqlx.Stmt `query:"update-drip-campaign"`
+	UpdateDripCampaignStatus *sqlx.Stmt `query:"update-drip-campaign-status"`
+	DeleteDripCampaign       *sqlx.Stmt `query:"delete-drip-campaign"`
+	UpdateDripCampaignCounts *sqlx.Stmt `query:"update-drip-campaign-counts"`
+
+	// Drip steps.
+	CreateDripStep       *sqlx.Stmt `query:"create-drip-step"`
+	GetDripSteps         *sqlx.Stmt `query:"get-drip-steps"`
+	GetDripStep          *sqlx.Stmt `query:"get-drip-step"`
+	UpdateDripStep       *sqlx.Stmt `query:"update-drip-step"`
+	DeleteDripStep       *sqlx.Stmt `query:"delete-drip-step"`
+	UpdateDripStepCounts *sqlx.Stmt `query:"update-drip-step-counts"`
+
+	// Drip enrollments.
+	EnrollSubscriberInDrip  *sqlx.Stmt `query:"enroll-subscriber-in-drip"`
+	GetPendingDripSends     *sqlx.Stmt `query:"get-pending-drip-sends"`
+	AdvanceDripEnrollment   *sqlx.Stmt `query:"advance-drip-enrollment"`
+	ExitDripEnrollment      *sqlx.Stmt `query:"exit-drip-enrollment"`
+	GetDripEnrollments      string     `query:"get-drip-enrollments"`
+	GetDripEnrollmentCount  *sqlx.Stmt `query:"get-drip-enrollment-count"`
+	InsertDripSendLog       *sqlx.Stmt `query:"insert-drip-send-log"`
+	GetActiveDripsByTrigger *sqlx.Stmt `query:"get-active-drips-by-trigger"`
+
+	// A/B tests.
+	CreateABTest          *sqlx.Stmt `query:"create-ab-test"`
+	GetABTest             *sqlx.Stmt `query:"get-ab-test"`
+	GetABTestByCampaign   *sqlx.Stmt `query:"get-ab-test-by-campaign"`
+	UpdateABTest          *sqlx.Stmt `query:"update-ab-test"`
+	UpdateABTestStatus    *sqlx.Stmt `query:"update-ab-test-status"`
+	DeleteABTest          *sqlx.Stmt `query:"delete-ab-test"`
+	CreateABVariant       *sqlx.Stmt `query:"create-ab-variant"`
+	GetABVariants         *sqlx.Stmt `query:"get-ab-variants"`
+	GetABVariant          *sqlx.Stmt `query:"get-ab-variant"`
+	UpdateABVariant       *sqlx.Stmt `query:"update-ab-variant"`
+	UpdateABVariantCounts *sqlx.Stmt `query:"update-ab-variant-counts"`
+	DeleteABVariant       *sqlx.Stmt `query:"delete-ab-variant"`
+	AssignSubscriberToVariant *sqlx.Stmt `query:"assign-subscriber-to-variant"`
+	GetSubscriberVariant     *sqlx.Stmt `query:"get-subscriber-variant"`
+	GetRunningABTests        *sqlx.Stmt `query:"get-running-ab-tests"`
+
+	// Automations.
+	CreateAutomation              *sqlx.Stmt `query:"create-automation"`
+	QueryAutomations              string     `query:"query-automations"`
+	GetAutomation                 *sqlx.Stmt `query:"get-automation"`
+	UpdateAutomation              *sqlx.Stmt `query:"update-automation"`
+	UpdateAutomationStatus        *sqlx.Stmt `query:"update-automation-status"`
+	DeleteAutomation              *sqlx.Stmt `query:"delete-automation"`
+	CreateAutomationNode          *sqlx.Stmt `query:"create-automation-node"`
+	GetAutomationNodes            *sqlx.Stmt `query:"get-automation-nodes"`
+	GetAutomationNode             *sqlx.Stmt `query:"get-automation-node"`
+	UpdateAutomationNode          *sqlx.Stmt `query:"update-automation-node"`
+	DeleteAutomationNode          *sqlx.Stmt `query:"delete-automation-node"`
+	CreateAutomationEdge          *sqlx.Stmt `query:"create-automation-edge"`
+	GetAutomationEdges            *sqlx.Stmt `query:"get-automation-edges"`
+	DeleteAutomationEdge          *sqlx.Stmt `query:"delete-automation-edge"`
+	DeleteAutomationEdgesByAuto   *sqlx.Stmt `query:"delete-automation-edges-by-automation"`
+	GetPendingAutoEnrollments     *sqlx.Stmt `query:"get-pending-automation-enrollments"`
+	EnrollInAutomation            *sqlx.Stmt `query:"enroll-in-automation"`
+	UpdateAutomationEnrollment    *sqlx.Stmt `query:"update-automation-enrollment"`
+
+	// Contact scoring.
+	CreateScoringRule      *sqlx.Stmt `query:"create-scoring-rule"`
+	GetScoringRules        *sqlx.Stmt `query:"get-scoring-rules"`
+	GetScoringRule         *sqlx.Stmt `query:"get-scoring-rule"`
+	GetScoringRulesByEvent *sqlx.Stmt `query:"get-scoring-rules-by-event"`
+	UpdateScoringRule      *sqlx.Stmt `query:"update-scoring-rule"`
+	DeleteScoringRule      *sqlx.Stmt `query:"delete-scoring-rule"`
+	UpdateSubscriberScore  *sqlx.Stmt `query:"update-subscriber-score"`
+	InsertScoreLog         *sqlx.Stmt `query:"insert-score-log"`
+	GetSubscriberScoreLog  string     `query:"get-subscriber-score-log"`
+	DecayInactiveScores    string     `query:"decay-inactive-scores"`
+
+	// CRM: deals and activities.
+	CreateDeal              *sqlx.Stmt `query:"create-deal"`
+	QueryDeals              string     `query:"query-deals"`
+	GetDeal                 *sqlx.Stmt `query:"get-deal"`
+	UpdateDeal              *sqlx.Stmt `query:"update-deal"`
+	DeleteDeal              *sqlx.Stmt `query:"delete-deal"`
+	GetDealPipeline         *sqlx.Stmt `query:"get-deal-pipeline"`
+	CreateActivity          *sqlx.Stmt `query:"create-activity"`
+	GetSubscriberActivities string     `query:"get-subscriber-activities"`
+	DeleteActivity          *sqlx.Stmt `query:"delete-activity"`
+
+	// Webhooks.
+	CreateWebhook      *sqlx.Stmt `query:"create-webhook"`
+	QueryWebhooks      string     `query:"query-webhooks"`
+	GetWebhook         *sqlx.Stmt `query:"get-webhook"`
+	UpdateWebhook      *sqlx.Stmt `query:"update-webhook"`
+	DeleteWebhook      *sqlx.Stmt `query:"delete-webhook"`
+	GetWebhooksByEvent *sqlx.Stmt `query:"get-webhooks-by-event"`
+	InsertWebhookLog   *sqlx.Stmt `query:"insert-webhook-log"`
+	QueryWebhookLog    string     `query:"query-webhook-log"`
 
 	CreateRole            *sqlx.Stmt `query:"create-role"`
 	GetUserRoles          *sqlx.Stmt `query:"get-user-roles"`

@@ -40,7 +40,61 @@
       <b-menu-item v-if="$can('campaigns:get_analytics')" :to="{ name: 'campaignAnalytics' }" tag="router-link"
         :active="activeItem.campaignAnalytics" data-cy="analytics" icon="chart-bar"
         :label="$t('globals.terms.analytics')" />
+      <b-menu-item v-if="$can('ab_tests:get')" :to="{ name: 'abTests' }" tag="router-link"
+        :active="activeItem.abTests" data-cy="ab-tests" icon="ab-testing"
+        label="A/B Tests" />
     </b-menu-item><!-- campaigns -->
+
+    <b-menu-item v-if="$can('segments:*')" :expanded="activeGroup.segments" :active="activeGroup.segments"
+      data-cy="segments" @update:active="(state) => toggleGroup('segments', state)" icon="segment"
+      label="Segments">
+      <b-menu-item v-if="$can('segments:get')" :to="{ name: 'segments' }" tag="router-link"
+        :active="activeItem.segments" data-cy="all-segments" icon="segment"
+        label="All Segments" />
+    </b-menu-item><!-- segments -->
+
+    <b-menu-item v-if="$can('drips:*')" :expanded="activeGroup.drips" :active="activeGroup.drips"
+      data-cy="drips" @update:active="(state) => toggleGroup('drips', state)" icon="water-outline"
+      label="Drip Campaigns">
+      <b-menu-item v-if="$can('drips:get')" :to="{ name: 'drips' }" tag="router-link"
+        :active="activeItem.drips" data-cy="all-drips" icon="water-outline"
+        label="All Drips" />
+    </b-menu-item><!-- drips -->
+
+    <b-menu-item v-if="$can('automations:*')" :expanded="activeGroup.automations" :active="activeGroup.automations"
+      data-cy="automations" @update:active="(state) => toggleGroup('automations', state)" icon="robot-outline"
+      label="Automations">
+      <b-menu-item v-if="$can('automations:get')" :to="{ name: 'automations' }" tag="router-link"
+        :active="activeItem.automations" data-cy="all-automations" icon="robot-outline"
+        label="All Automations" />
+    </b-menu-item><!-- automations -->
+
+    <b-menu-item v-if="$can('scoring:*')" :expanded="activeGroup.scoring" :active="activeGroup.scoring"
+      data-cy="scoring" @update:active="(state) => toggleGroup('scoring', state)" icon="star-outline"
+      label="Scoring">
+      <b-menu-item v-if="$can('scoring:get')" :to="{ name: 'scoring' }" tag="router-link"
+        :active="activeItem.scoring" data-cy="scoring-rules" icon="star-outline"
+        label="Scoring Rules" />
+    </b-menu-item><!-- scoring -->
+
+    <b-menu-item v-if="$can('deals:*', 'activities:*')" :expanded="activeGroup.crm" :active="activeGroup.crm"
+      data-cy="crm" @update:active="(state) => toggleGroup('crm', state)" icon="briefcase-outline"
+      label="CRM">
+      <b-menu-item v-if="$can('deals:get')" :to="{ name: 'deals' }" tag="router-link"
+        :active="activeItem.deals" data-cy="deals" icon="briefcase-outline"
+        label="Deals" />
+      <b-menu-item v-if="$can('activities:get')" :to="{ name: 'activities' }" tag="router-link"
+        :active="activeItem.activities" data-cy="activities" icon="format-list-bulleted-square"
+        label="Activities" />
+    </b-menu-item><!-- crm -->
+
+    <b-menu-item v-if="$can('webhooks:*')" :expanded="activeGroup.webhooks" :active="activeGroup.webhooks"
+      data-cy="webhooks" @update:active="(state) => toggleGroup('webhooks', state)" icon="webhook"
+      label="Webhooks">
+      <b-menu-item v-if="$can('webhooks:get')" :to="{ name: 'webhooks' }" tag="router-link"
+        :active="activeItem.webhooks" data-cy="all-webhooks" icon="webhook"
+        label="All Webhooks" />
+    </b-menu-item><!-- webhooks -->
 
     <b-menu-item v-if="$can('users:*', 'roles:*')" :expanded="activeGroup.users" :active="activeGroup.users"
       data-cy="users" @update:active="(state) => toggleGroup('users', state)" icon="account-multiple"

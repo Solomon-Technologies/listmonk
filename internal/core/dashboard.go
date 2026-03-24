@@ -32,3 +32,14 @@ func (c *Core) GetDashboardCounts() (types.JSONText, error) {
 
 	return out, nil
 }
+
+// GetDashboardFeatureCounts returns counts for Solomon platform features.
+func (c *Core) GetDashboardFeatureCounts() (types.JSONText, error) {
+	var out types.JSONText
+	if err := c.q.GetDashboardFeatureCounts.Get(&out); err != nil {
+		return nil, echo.NewHTTPError(http.StatusInternalServerError,
+			c.i18n.Ts("globals.messages.errorFetching", "name", "feature counts", "error", pqErrMsg(err)))
+	}
+
+	return out, nil
+}

@@ -153,4 +153,10 @@ type Settings struct {
 	AdminCustomJS   string `json:"appearance.admin.custom_js"`
 	PublicCustomCSS string `json:"appearance.public.custom_css"`
 	PublicCustomJS  string `json:"appearance.public.custom_js"`
+
+	CRMDealStages      []string `json:"crm.deal_stages"`
+	CRMCurrencies      []string `json:"crm.currencies"`
+	CRMActivityTypes   []string `json:"crm.activity_types"`
+	CRMDefaultDealStage string  `json:"crm.default_deal_stage"`
+	CRMDefaultCurrency  string  `json:"crm.default_currency"`
 }

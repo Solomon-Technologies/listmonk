@@ -23,7 +23,7 @@ $body-family: "Inter", "Helvetica Neue", sans-serif;
 $body-size: 15px;
 $background: $white-bis;
 $body-background-color: $white-bis;
-$primary: #0055d4;
+$primary: #2563EB;
 $green: #36995b;
 $turquoise: $green;
 $red: #FF5722;
@@ -228,15 +228,20 @@ section {
 .navbar-brand {
   padding: 0 0 0 25px;
   .favicon {
-    display: none;
+    display: inline-block;
+    max-height: 28px;
+    margin-top: 10px;
+    vertical-align: middle;
   }
-  .full {
-    max-height: 17px;
-    margin-top: 15px;
-  }
-  .favicon {
-    margin-top: 12px;
-    max-height: 24px;
+  .brand-name {
+    display: inline-block;
+    font-size: 16px;
+    font-weight: 600;
+    color: #0F172A;
+    margin-left: 8px;
+    vertical-align: middle;
+    margin-top: 10px;
+    letter-spacing: 0.02em;
   }
 }
 
@@ -1272,11 +1277,11 @@ th.role-toggle-select a {
   }
 
   .navbar-brand {
-    .full {
+    .brand-name {
       display: none;
     }
     .favicon {
-      display: block;
+      display: inline-block;
     }
     padding-left: 10px;
   }

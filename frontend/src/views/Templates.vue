@@ -57,12 +57,10 @@
 
       <b-table-column v-slot="props" cell-class="actions" align="right">
         <div>
-          <a href="#" @click.prevent="previewTemplate(props.row)" data-cy="btn-preview"
-            :aria-label="$t('templates.preview')">
-            <b-tooltip :label="$t('templates.preview')" type="is-dark">
-              <b-icon icon="file-find-outline" size="is-small" />
-            </b-tooltip>
-          </a>
+          <b-button size="is-small" type="is-primary is-light" icon-left="file-find-outline"
+            @click="previewTemplate(props.row)" data-cy="btn-preview">
+            Preview
+          </b-button>
           <a href="#" @click.prevent="showEditForm(props.row)" data-cy="btn-edit"
             :aria-label="$t('globals.buttons.edit')">
             <b-tooltip :label="$t('globals.buttons.edit')" type="is-dark">

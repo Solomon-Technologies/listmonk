@@ -57,6 +57,10 @@
           <b-tab-item :label="$t('settings.appearance.name')">
             <appearance-settings :form="form" :key="key" />
           </b-tab-item><!-- appearance -->
+
+          <b-tab-item label="CRM">
+            <crm-settings :form="form" :key="key" />
+          </b-tab-item><!-- crm -->
         </b-tabs>
       </section>
     </section>
@@ -75,6 +79,7 @@ import PerformanceSettings from './settings/performance.vue';
 import PrivacySettings from './settings/privacy.vue';
 import SecuritySettings from './settings/security.vue';
 import SmtpSettings from './settings/smtp.vue';
+import CrmSettings from './settings/crm.vue';
 
 export default Vue.extend({
   components: {
@@ -87,6 +92,7 @@ export default Vue.extend({
     BounceSettings,
     MessengerSettings,
     AppearanceSettings,
+    CrmSettings,
   },
 
   data() {

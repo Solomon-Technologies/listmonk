@@ -15,6 +15,28 @@ UPDATE settings AS s SET value = c.value
 -- name: update-settings-by-key
 UPDATE settings SET value = $2, updated_at = NOW() WHERE key = $1;
 
+-- name: get-dashboard-feature-counts
+SELECT JSON_BUILD_OBJECT(
+    'drips', JSON_BUILD_OBJECT(
+        'total', (SELECT COUNT(*) FROM drip_campaigns),
+        'active', (SELECT COUNT(*) FROM drip_campaigns WHERE status = 'active')
+    ),
+    'automations', JSON_BUILD_OBJECT(
+        'total', (SELECT COUNT(*) FROM automations),
+        'active', (SELECT COUNT(*) FROM automations WHERE status = 'active')
+    ),
+    'segments', (SELECT COUNT(*) FROM segments),
+    'scoring_rules', (SELECT COUNT(*) FROM scoring_rules),
+    'deals', JSON_BUILD_OBJECT(
+        'total', (SELECT COUNT(*) FROM deals),
+        'open', (SELECT COUNT(*) FROM deals WHERE status = 'open')
+    ),
+    'webhooks', JSON_BUILD_OBJECT(
+        'total', (SELECT COUNT(*) FROM webhooks),
+        'active', (SELECT COUNT(*) FROM webhooks WHERE enabled = true)
+    )
+) AS data;
+
 -- name: get-db-info
 SELECT JSON_BUILD_OBJECT('version', (SELECT VERSION()),
                         'size_mb', (SELECT ROUND(pg_database_size((SELECT CURRENT_DATABASE()))/(1024^2)))) AS info;

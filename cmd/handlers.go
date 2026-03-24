@@ -104,6 +104,7 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.GET("/api/lang/:lang", a.GetI18nLang)
 		g.GET("/api/dashboard/charts", a.GetDashboardCharts)
 		g.GET("/api/dashboard/counts", a.GetDashboardCounts)
+		g.GET("/api/dashboard/features", a.GetDashboardFeatureCounts)
 
 		g.GET("/api/settings", pm(a.GetSettings, "settings:get"))
 		g.PUT("/api/settings", pm(a.UpdateSettings, "settings:manage"))
@@ -217,6 +218,79 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.PUT("/api/roles/lists/:id", pm(hasID(a.UpdateListRole), "roles:manage"))
 		g.DELETE("/api/roles/:id", pm(hasID(a.DeleteRole), "roles:manage"))
 
+		// Segments.
+		g.GET("/api/segments", pm(a.GetSegments, "segments:get"))
+		g.GET("/api/segments/:id", pm(hasID(a.GetSegment), "segments:get"))
+		g.GET("/api/segments/:id/subscribers", pm(hasID(a.GetSegmentSubscribers), "segments:get"))
+		g.GET("/api/segments/:id/count", pm(hasID(a.GetSegmentCount), "segments:get"))
+		g.POST("/api/segments", pm(a.CreateSegment, "segments:manage"))
+		g.PUT("/api/segments/:id", pm(hasID(a.UpdateSegment), "segments:manage"))
+		g.DELETE("/api/segments/:id", pm(hasID(a.DeleteSegment), "segments:manage"))
+
+		// Webhooks.
+		g.GET("/api/webhooks", pm(a.GetWebhooks, "webhooks:get"))
+		g.GET("/api/webhooks/:id", pm(hasID(a.GetWebhook), "webhooks:get"))
+		g.GET("/api/webhooks/:id/log", pm(hasID(a.GetWebhookLog), "webhooks:get"))
+		g.POST("/api/webhooks", pm(a.CreateWebhook, "webhooks:manage"))
+		g.PUT("/api/webhooks/:id", pm(hasID(a.UpdateWebhook), "webhooks:manage"))
+		g.DELETE("/api/webhooks/:id", pm(hasID(a.DeleteWebhook), "webhooks:manage"))
+		g.POST("/api/webhooks/:id/test", pm(hasID(a.TestWebhook), "webhooks:manage"))
+
+		// Drip campaigns.
+		g.GET("/api/drips", pm(a.GetDripCampaigns, "drips:get"))
+		g.GET("/api/drips/:id", pm(hasID(a.GetDripCampaign), "drips:get"))
+		g.GET("/api/drips/:id/steps", pm(hasID(a.GetDripSteps), "drips:get"))
+		g.GET("/api/drips/:id/enrollments", pm(hasID(a.GetDripEnrollments), "drips:get"))
+		g.POST("/api/drips", pm(a.CreateDripCampaign, "drips:manage"))
+		g.PUT("/api/drips/:id", pm(hasID(a.UpdateDripCampaign), "drips:manage"))
+		g.PUT("/api/drips/:id/status", pm(hasID(a.UpdateDripCampaignStatus), "drips:manage"))
+		g.DELETE("/api/drips/:id", pm(hasID(a.DeleteDripCampaign), "drips:manage"))
+		g.POST("/api/drips/:id/steps", pm(hasID(a.CreateDripStep), "drips:manage"))
+		g.PUT("/api/drips/:id/steps/:stepID", pm(hasID(a.UpdateDripStep), "drips:manage"))
+		g.DELETE("/api/drips/:id/steps/:stepID", pm(hasID(a.DeleteDripStep), "drips:manage"))
+		g.POST("/api/drips/:id/enroll", pm(hasID(a.EnrollSubscriberInDrip), "drips:manage"))
+
+		// A/B tests.
+		g.GET("/api/ab-tests/:id", pm(hasID(a.GetABTest), "ab_tests:get"))
+		g.GET("/api/campaigns/:id/ab-test", pm(hasID(a.GetABTestByCampaign), "ab_tests:get"))
+		g.POST("/api/ab-tests", pm(a.CreateABTest, "ab_tests:manage"))
+		g.PUT("/api/ab-tests/:id", pm(hasID(a.UpdateABTest), "ab_tests:manage"))
+		g.DELETE("/api/ab-tests/:id", pm(hasID(a.DeleteABTest), "ab_tests:manage"))
+		g.POST("/api/ab-tests/:id/variants", pm(hasID(a.CreateABVariant), "ab_tests:manage"))
+		g.PUT("/api/ab-tests/:id/variants/:variantID", pm(hasID(a.UpdateABVariant), "ab_tests:manage"))
+		g.DELETE("/api/ab-tests/:id/variants/:variantID", pm(hasID(a.DeleteABVariant), "ab_tests:manage"))
+
+		// Automations.
+		g.GET("/api/automations", pm(a.GetAutomations, "automations:get"))
+		g.GET("/api/automations/:id", pm(hasID(a.GetAutomation), "automations:get"))
+		g.POST("/api/automations", pm(a.CreateAutomation, "automations:manage"))
+		g.PUT("/api/automations/:id", pm(hasID(a.UpdateAutomation), "automations:manage"))
+		g.DELETE("/api/automations/:id", pm(hasID(a.DeleteAutomation), "automations:manage"))
+		g.POST("/api/automations/:id/nodes", pm(hasID(a.CreateAutomationNode), "automations:manage"))
+		g.PUT("/api/automations/:id/nodes/:nodeID", pm(hasID(a.UpdateAutomationNode), "automations:manage"))
+		g.DELETE("/api/automations/:id/nodes/:nodeID", pm(hasID(a.DeleteAutomationNode), "automations:manage"))
+		g.POST("/api/automations/:id/edges", pm(hasID(a.CreateAutomationEdge), "automations:manage"))
+		g.DELETE("/api/automations/:id/edges/:edgeID", pm(hasID(a.DeleteAutomationEdge), "automations:manage"))
+
+		// Contact scoring.
+		g.GET("/api/scoring/rules", pm(a.GetScoringRules, "scoring:get"))
+		g.GET("/api/scoring/rules/:id", pm(hasID(a.GetScoringRule), "scoring:get"))
+		g.POST("/api/scoring/rules", pm(a.CreateScoringRule, "scoring:manage"))
+		g.PUT("/api/scoring/rules/:id", pm(hasID(a.UpdateScoringRule), "scoring:manage"))
+		g.DELETE("/api/scoring/rules/:id", pm(hasID(a.DeleteScoringRule), "scoring:manage"))
+		g.GET("/api/subscribers/:id/score-log", pm(hasID(a.GetSubscriberScoreLog), "scoring:get"))
+
+		// CRM: deals and activities.
+		g.GET("/api/deals", pm(a.GetDeals, "deals:get"))
+		g.GET("/api/deals/:id", pm(hasID(a.GetDeal), "deals:get"))
+		g.GET("/api/deals/pipeline", pm(a.GetDealPipeline, "deals:get"))
+		g.POST("/api/deals", pm(a.CreateDeal, "deals:manage"))
+		g.PUT("/api/deals/:id", pm(hasID(a.UpdateDeal), "deals:manage"))
+		g.DELETE("/api/deals/:id", pm(hasID(a.DeleteDeal), "deals:manage"))
+		g.GET("/api/subscribers/:id/activities", pm(hasID(a.GetSubscriberActivities), "activities:get"))
+		g.POST("/api/subscribers/:id/activities", pm(hasID(a.CreateActivity), "activities:manage"))
+		g.DELETE("/api/activities/:activityID", pm(a.DeleteActivity, "activities:manage"))
+
 		if a.cfg.BounceWebhooksEnabled {
 			// Private authenticated bounce endpoint.
 			g.POST("/webhooks/bounce", pm(a.BounceWebhook, "webhooks:post_bounce"))
@@ -236,7 +310,7 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 
 		// Landing page.
 		g.GET("/", func(c echo.Context) error {
-			return c.Render(http.StatusOK, "home", publicTpl{Title: "listmonk"})
+			return c.Render(http.StatusOK, "home", publicTpl{Title: "Solomon Email Platform"})
 		})
 
 		// Public admin endpoints (login page, OIDC endpoints, password reset).

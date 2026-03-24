@@ -112,6 +112,16 @@ func (a *App) GetDashboardCounts(c echo.Context) error {
 	return c.JSON(http.StatusOK, okResp{out})
 }
 
+// GetDashboardFeatureCounts returns counts for Solomon platform features.
+func (a *App) GetDashboardFeatureCounts(c echo.Context) error {
+	out, err := a.core.GetDashboardFeatureCounts()
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, okResp{out})
+}
+
 // ReloadApp sends a reload signal to the app, causing a full restart.
 func (a *App) ReloadApp(c echo.Context) error {
 	go func() {
