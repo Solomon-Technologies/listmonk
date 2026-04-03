@@ -268,22 +268,10 @@ export default Vue.extend({
       this.loading = true;
       this.$api.getAutomation(id).then((data) => {
         this.automation = data;
+        this.nodes = data.nodes || [];
+        this.edges = data.edges || [];
         this.loading = false;
       }).catch(() => { this.loading = false; });
-    },
-
-    getNodes() {
-      const id = parseInt(this.$route.params.id, 10);
-      this.$api.getAutomationNodes(id).then((data) => {
-        this.nodes = data || [];
-      });
-    },
-
-    getEdges() {
-      const id = parseInt(this.$route.params.id, 10);
-      this.$api.getAutomationEdges(id).then((data) => {
-        this.edges = data || [];
-      });
     },
 
     saveAutomation() {
@@ -316,7 +304,7 @@ export default Vue.extend({
         position_x: 0,
         position_y: this.nodes.length * 120,
       }).then(() => {
-        this.getNodes();
+        this.getAutomation();
         this.$utils.toast(`${this.getNodeLabel(nodeType)} added`);
       });
     },
@@ -335,7 +323,7 @@ export default Vue.extend({
         config: this.nodeConfig,
       }).then(() => {
         this.isNodeEditorVisible = false;
-        this.getNodes();
+        this.getAutomation();
         this.$utils.toast('Node updated');
         this.savingNode = false;
       }).catch(() => { this.savingNode = false; });
@@ -344,7 +332,7 @@ export default Vue.extend({
     deleteNode(node) {
       const id = parseInt(this.$route.params.id, 10);
       this.$api.deleteAutomationNode(id, node.id).then(() => {
-        this.getNodes();
+        this.getAutomation();
         this.$utils.toast('Node removed');
       });
     },
@@ -353,7 +341,6 @@ export default Vue.extend({
   created() {
     this.$root.$on('page.refresh', () => {
       this.getAutomation();
-      this.getNodes();
     });
   },
 
@@ -363,8 +350,6 @@ export default Vue.extend({
 
   mounted() {
     this.getAutomation();
-    this.getNodes();
-    this.getEdges();
   },
 });
 </script>

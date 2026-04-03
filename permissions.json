@@ -137,5 +137,13 @@
             "activities:get",
             "activities:manage"
         ]
+    },
+    {
+        "group": "warming",
+        "permissions":
+        [
+            "warming:get",
+            "warming:manage"
+        ]
     }
 ]

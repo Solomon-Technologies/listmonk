@@ -42,6 +42,7 @@ type DripCampaign struct {
 	TotalEntered   int            `db:"total_entered" json:"total_entered"`
 	TotalCompleted int            `db:"total_completed" json:"total_completed"`
 	TotalExited    int            `db:"total_exited" json:"total_exited"`
+	MaxSendPerDay  int            `db:"max_send_per_day" json:"max_send_per_day"`
 
 	// Loaded separately.
 	Steps []DripStep `db:"-" json:"steps,omitempty"`
@@ -115,6 +116,10 @@ type PendingDripSend struct {
 	Headers           types.JSONText `db:"headers"`
 	CampaignFromEmail string         `db:"campaign_from_email"`
 	CampaignName      string         `db:"campaign_name"`
+	CampaignUUID      string         `db:"campaign_uuid"`
+	StepUUID          string         `db:"step_uuid"`
+	MaxSendPerDay     int            `db:"max_send_per_day"`
+	TemplateBody      string         `db:"template_body"`
 }
 
 // DripSendLog represents a drip send log entry.

@@ -115,7 +115,7 @@ export const getDashboardCharts = () => http.get(
 
 export const getDashboardFeatureCounts = () => http.get(
   '/api/dashboard/features',
-  { loading: models.dashboard },
+  { loading: models.dashboard, camelCase: false },
 );
 
 // Lists.
@@ -615,6 +615,30 @@ export const updateDripStep = (id, stepId, data) => http.put(`/api/drips/${id}/s
 export const deleteDripStep = (id, stepId) => http.delete(`/api/drips/${id}/steps/${stepId}`);
 export const getDripEnrollments = async (id, params) => http.get(`/api/drips/${id}/enrollments`, { params });
 export const enrollSubscriberInDrip = (id, subscriberId) => http.post(`/api/drips/${id}/enroll`, { subscriber_id: subscriberId });
+export const bulkEnrollInDrip = (id, subscriberIds) => http.post(`/api/drips/${id}/enroll-bulk`, { subscriber_ids: subscriberIds });
+
+// Warming (camelCase: false to keep snake_case keys matching Go json tags).
+export const getWarmingAddresses = async () => http.get('/api/warming/addresses', { camelCase: false });
+export const createWarmingAddress = (data) => http.post('/api/warming/addresses', data);
+export const updateWarmingAddress = (id, data) => http.put(`/api/warming/addresses/${id}`, data);
+export const deleteWarmingAddress = (id) => http.delete(`/api/warming/addresses/${id}`);
+export const getWarmingSenders = async () => http.get('/api/warming/senders', { camelCase: false });
+export const createWarmingSender = (data) => http.post('/api/warming/senders', data);
+export const updateWarmingSender = (id, data) => http.put(`/api/warming/senders/${id}`, data);
+export const deleteWarmingSender = (id) => http.delete(`/api/warming/senders/${id}`);
+export const getWarmingTemplates = async () => http.get('/api/warming/templates', { camelCase: false });
+export const createWarmingTemplate = (data) => http.post('/api/warming/templates', data);
+export const updateWarmingTemplate = (id, data) => http.put(`/api/warming/templates/${id}`, data);
+export const deleteWarmingTemplate = (id) => http.delete(`/api/warming/templates/${id}`);
+export const getWarmingConfig = async () => http.get('/api/warming/config', { camelCase: false });
+export const updateWarmingConfig = (data) => http.put('/api/warming/config', data);
+export const getWarmingSendLog = async (params) => http.get('/api/warming/log', { params, camelCase: false });
+export const getWarmingStats = async () => http.get('/api/warming/stats', { camelCase: false });
+export const getWarmingCampaigns = async () => http.get('/api/warming/campaigns', { camelCase: false });
+export const createWarmingCampaign = (data) => http.post('/api/warming/campaigns', data);
+export const updateWarmingCampaign = (id, data) => http.put(`/api/warming/campaigns/${id}`, data);
+export const deleteWarmingCampaign = (id) => http.delete(`/api/warming/campaigns/${id}`);
+export const getWarmingCampaignStats = async (id) => http.get(`/api/warming/campaigns/${id}/stats`, { camelCase: false });
 
 // A/B tests.
 export const getABTest = async (id) => http.get(`/api/ab-tests/${id}`);

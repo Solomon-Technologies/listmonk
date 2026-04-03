@@ -559,6 +559,9 @@ func (a *App) LinkRedirect(c echo.Context) error {
 		return c.Render(e.Code, tplMessage, makeMsgTpl(a.i18n.T("public.errorTitle"), "", e.Error()))
 	}
 
+	// Also try to record the click for drip step tracking (campUUID may be a step UUID).
+	_ = a.core.RegisterDripStepClicked(campUUID)
+
 	return c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
@@ -583,7 +586,8 @@ func (a *App) RegisterCampaignView(c echo.Context) error {
 	campUUID := c.Param("campUUID")
 	if campUUID != dummyUUID && subUUID != dummyUUID {
 		if err := a.core.RegisterCampaignView(campUUID, subUUID); err != nil {
-			a.log.Printf("error registering campaign view: %s", err)
+			// Fallback: campUUID might be a drip step UUID. Try drip step tracking.
+			_ = a.core.RegisterDripStepOpened(campUUID)
 		}
 	}
 

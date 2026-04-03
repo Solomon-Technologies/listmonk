@@ -34,6 +34,13 @@ SELECT JSON_BUILD_OBJECT(
     'webhooks', JSON_BUILD_OBJECT(
         'total', (SELECT COUNT(*) FROM webhooks),
         'active', (SELECT COUNT(*) FROM webhooks WHERE enabled = true)
+    ),
+    'warming', JSON_BUILD_OBJECT(
+        'campaigns', (SELECT COUNT(*) FROM warming_campaigns),
+        'active', (SELECT COUNT(*) FROM warming_campaigns WHERE status = 'active'),
+        'sent_today', (SELECT COUNT(*) FROM warming_send_log WHERE sent_at >= CURRENT_DATE AND status = 'sent'),
+        'total_sent', (SELECT COUNT(*) FROM warming_send_log WHERE status = 'sent'),
+        'total_errors', (SELECT COUNT(*) FROM warming_send_log WHERE status = 'failed')
     )
 ) AS data;
 

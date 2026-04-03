@@ -219,3 +219,28 @@ func (a *App) EnrollSubscriberInDrip(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, okResp{Data: true})
 }
+
+// BulkEnrollInDrip handles bulk enrollment of multiple subscribers.
+func (a *App) BulkEnrollInDrip(c echo.Context) error {
+	id := getID(c)
+
+	var o struct {
+		SubscriberIDs []int `json:"subscriber_ids"`
+	}
+	if err := c.Bind(&o); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request: "+err.Error())
+	}
+
+	if len(o.SubscriberIDs) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "subscriber_ids is required")
+	}
+
+	n, err := a.core.BulkEnrollInDrip(id, o.SubscriberIDs)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, okResp{Data: struct {
+		Enrolled int `json:"enrolled"`
+	}{n}})
+}

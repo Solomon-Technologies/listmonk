@@ -88,6 +88,26 @@
         label="Activities" />
     </b-menu-item><!-- crm -->
 
+    <b-menu-item v-if="$can('warming:*')" :expanded="activeGroup.warming" :active="activeGroup.warming"
+      data-cy="warming" @update:active="(state) => toggleGroup('warming', state)" icon="fire"
+      label="Email Warming">
+      <b-menu-item v-if="$can('warming:get')" :to="{ name: 'warmingCampaigns' }" tag="router-link"
+        :active="activeItem.warmingCampaigns" data-cy="warming-campaigns" icon="fire"
+        label="All Campaigns" />
+      <b-menu-item v-if="$can('warming:get')" :to="{ name: 'warmingRecipients' }" tag="router-link"
+        :active="activeItem.warmingRecipients" data-cy="warming-recipients" icon="account-multiple"
+        label="Recipients" />
+      <b-menu-item v-if="$can('warming:get')" :to="{ name: 'warmingSenders' }" tag="router-link"
+        :active="activeItem.warmingSenders" data-cy="warming-senders" icon="email-outline"
+        label="Senders" />
+      <b-menu-item v-if="$can('warming:get')" :to="{ name: 'warmingTemplates' }" tag="router-link"
+        :active="activeItem.warmingTemplates" data-cy="warming-templates" icon="file-document-outline"
+        label="Templates" />
+      <b-menu-item v-if="$can('warming:get')" :to="{ name: 'warmingSendLog' }" tag="router-link"
+        :active="activeItem.warmingSendLog" data-cy="warming-log" icon="format-list-bulleted-square"
+        label="Send Log" />
+    </b-menu-item><!-- warming -->
+
     <b-menu-item v-if="$can('webhooks:*')" :expanded="activeGroup.webhooks" :active="activeGroup.webhooks"
       data-cy="webhooks" @update:active="(state) => toggleGroup('webhooks', state)" icon="webhook"
       label="Webhooks">

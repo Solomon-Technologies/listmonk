@@ -165,6 +165,56 @@ type Queries struct {
 	InsertDripSendLog       *sqlx.Stmt `query:"insert-drip-send-log"`
 	GetActiveDripsByTrigger *sqlx.Stmt `query:"get-active-drips-by-trigger"`
 
+	// Drip production queries.
+	GetDripSendsToday           *sqlx.Stmt `query:"get-drip-sends-today"`
+	UpdateDripStepSent          *sqlx.Stmt `query:"update-drip-step-sent"`
+	UpdateDripStepOpened        *sqlx.Stmt `query:"update-drip-step-opened"`
+	UpdateDripStepClicked       *sqlx.Stmt `query:"update-drip-step-clicked"`
+	UpdateDripCampaignEntered   *sqlx.Stmt `query:"update-drip-campaign-entered"`
+	UpdateDripCampaignCompleted *sqlx.Stmt `query:"update-drip-campaign-completed"`
+	BulkEnrollInDrip            *sqlx.Stmt `query:"bulk-enroll-in-drip"`
+	GetDripCampaignByUUID       *sqlx.Stmt `query:"get-drip-campaign-by-uuid"`
+	GetDripStepByUUID           *sqlx.Stmt `query:"get-drip-step-by-uuid"`
+
+	// Warming.
+	GetWarmingAddresses       *sqlx.Stmt `query:"get-warming-addresses"`
+	CreateWarmingAddress      *sqlx.Stmt `query:"create-warming-address"`
+	UpdateWarmingAddress      *sqlx.Stmt `query:"update-warming-address"`
+	DeleteWarmingAddress      *sqlx.Stmt `query:"delete-warming-address"`
+	GetActiveWarmingAddresses *sqlx.Stmt `query:"get-active-warming-addresses"`
+	GetWarmingSenders         *sqlx.Stmt `query:"get-warming-senders"`
+	CreateWarmingSender       *sqlx.Stmt `query:"create-warming-sender"`
+	UpdateWarmingSender       *sqlx.Stmt `query:"update-warming-sender"`
+	DeleteWarmingSender       *sqlx.Stmt `query:"delete-warming-sender"`
+	GetActiveWarmingSenders   *sqlx.Stmt `query:"get-active-warming-senders"`
+	GetWarmingTemplates       *sqlx.Stmt `query:"get-warming-templates"`
+	CreateWarmingTemplate     *sqlx.Stmt `query:"create-warming-template"`
+	UpdateWarmingTemplate     *sqlx.Stmt `query:"update-warming-template"`
+	DeleteWarmingTemplate     *sqlx.Stmt `query:"delete-warming-template"`
+	GetActiveWarmingTemplates *sqlx.Stmt `query:"get-active-warming-templates"`
+	GetWarmingConfig          *sqlx.Stmt `query:"get-warming-config"`
+	UpdateWarmingConfig       *sqlx.Stmt `query:"update-warming-config"`
+	GetWarmingSendsToday      *sqlx.Stmt `query:"get-warming-sends-today"`
+	InsertWarmingSendLog      *sqlx.Stmt `query:"insert-warming-send-log"`
+	GetWarmingSendLog         string     `query:"get-warming-send-log"`
+	GetWarmingSendLogCount    *sqlx.Stmt `query:"get-warming-send-log-count"`
+
+	// Warming campaigns.
+	GetWarmingCampaigns          *sqlx.Stmt `query:"get-warming-campaigns"`
+	CreateWarmingCampaign        *sqlx.Stmt `query:"create-warming-campaign"`
+	UpdateWarmingCampaign        *sqlx.Stmt `query:"update-warming-campaign"`
+	DeleteWarmingCampaign        *sqlx.Stmt `query:"delete-warming-campaign"`
+	GetActiveWarmingCampaigns    *sqlx.Stmt `query:"get-active-warming-campaigns"`
+	GetWarmingSendersByDomains   *sqlx.Stmt `query:"get-warming-senders-by-domains"`
+	GetWarmingSendsTodayByCampaign *sqlx.Stmt `query:"get-warming-sends-today-by-campaign"`
+	InsertWarmingSendLogCampaign      *sqlx.Stmt `query:"insert-warming-send-log-campaign"`
+	GetWarmingSendLogByCampaign       string     `query:"get-warming-send-log-by-campaign"`
+	GetWarmingSendLogCountByCampaign  *sqlx.Stmt `query:"get-warming-send-log-count-by-campaign"`
+	GetWarmingSendsLastHourByCampaign *sqlx.Stmt `query:"get-warming-sends-last-hour-by-campaign"`
+	SetWarmingCampaignStartDate      *sqlx.Stmt `query:"set-warming-campaign-start-date"`
+	GetWarmingCampaignStatsByID      *sqlx.Stmt `query:"get-warming-campaign-stats-by-id"`
+	GetWarmingSenderByID             *sqlx.Stmt `query:"get-warming-sender-by-id"`
+
 	// A/B tests.
 	CreateABTest          *sqlx.Stmt `query:"create-ab-test"`
 	GetABTest             *sqlx.Stmt `query:"get-ab-test"`

@@ -106,7 +106,7 @@
                   <div class="column is-12">
                     <p class="title">
                       <b-icon icon="email-outline" />
-                      {{ $utils.niceNumber(counts.messages) }}
+                      {{ $utils.niceNumber(totalMessagesSent) }}
                     </p>
                     <p class="is-size-6 has-text-grey">
                       {{ $t('dashboard.messagesSent') }}
@@ -211,6 +211,37 @@
                       <li>
                         <label for="#">{{ features.webhooks ? features.webhooks.active : 0 }}</label>
                         Active
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+                <hr />
+                <div class="columns is-mobile">
+                  <div class="column is-6">
+                    <p class="title">
+                      <b-icon icon="fire" />
+                      {{ features.warming ? features.warming.total_sent : 0 }}
+                    </p>
+                    <p class="is-size-6 has-text-grey">Warming Emails Sent</p>
+                  </div>
+                  <div class="column is-6">
+                    <ul class="no has-text-grey">
+                      <li>
+                        <label for="#">{{ features.warming ? features.warming.campaigns : 0 }}</label>
+                        Campaigns
+                        ({{ features.warming ? features.warming.active : 0 }} active)
+                      </li>
+                      <li>
+                        <label for="#">{{ features.warming ? features.warming.sent_today : 0 }}</label>
+                        Sent today
+                      </li>
+                      <li>
+                        <label for="#">{{ features.warming ? features.warming.total_errors : 0 }}</label>
+                        Errors
+                      </li>
+                      <li>
+                        <router-link :to="{ name: 'warmingSendLog' }"
+                          class="is-size-7">View send log &rarr;</router-link>
                       </li>
                     </ul>
                   </div>
@@ -325,6 +356,12 @@ export default Vue.extend({
     ...mapState(['settings']),
     dayjs() {
       return dayjs;
+    },
+    totalMessagesSent() {
+      const campaignSent = this.counts.messages || 0;
+      const warmingSent = this.features.warming
+        ? this.features.warming.total_sent || 0 : 0;
+      return campaignSent + warmingSent;
     },
   },
 

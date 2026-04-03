@@ -25,6 +25,7 @@ import (
 	"github.com/knadh/listmonk/internal/manager"
 	"github.com/knadh/listmonk/internal/media"
 	"github.com/knadh/listmonk/internal/messenger/email"
+	"github.com/knadh/listmonk/internal/notifs"
 	"github.com/knadh/listmonk/internal/subimporter"
 	"github.com/knadh/listmonk/internal/webhooks"
 	"github.com/knadh/listmonk/models"
@@ -48,8 +49,9 @@ type App struct {
 	media      media.Store
 	bounce     *bounce.Manager
 	webhookMgr    *webhooks.Manager
-	dripProcessor *manager.DripProcessor
-	captcha       *captcha.Captcha
+	dripProcessor    *manager.DripProcessor
+	warmingProcessor *manager.WarmingProcessor
+	captcha          *captcha.Captcha
 	i18n       *i18n.I18n
 	pg         *paginator.Paginator
 	events     *events.Events
@@ -271,8 +273,18 @@ func main() {
 	dripProcessor := manager.NewDripProcessor(core, mgr, lo, manager.DripConfig{
 		BatchSize: 100,
 		Interval:  30 * time.Second,
+		FnNotify: func(subject, tplName string, data any) error {
+			return notifs.NotifySystem(subject, tplName, data, nil)
+		},
+		FnWebhook: webhookMgr.Dispatch,
 	})
 	go dripProcessor.Run()
+
+	// Start the warming email processor.
+	warmingProcessor := manager.NewWarmingProcessor(core, mgr, lo, manager.WarmingProcessorConfig{
+		Interval: 60 * time.Second,
+	})
+	go warmingProcessor.Run()
 
 	// =========================================================================
 	// Initialize the App{} with all the global shared components, controllers and fields.
@@ -291,8 +303,9 @@ func main() {
 		media:      media,
 		bounce:     bounce,
 		webhookMgr:    webhookMgr,
-		dripProcessor: dripProcessor,
-		captcha:       initCaptcha(),
+		dripProcessor:    dripProcessor,
+		warmingProcessor: warmingProcessor,
+		captcha:          initCaptcha(),
 		i18n:       i18n,
 		log:        lo,
 		events:     evStream,
@@ -338,6 +351,9 @@ func main() {
 
 		// Close the drip processor.
 		dripProcessor.Close()
+
+		// Close the warming processor.
+		warmingProcessor.Close()
 
 		// Close the webhook manager.
 		webhookMgr.Close()

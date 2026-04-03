@@ -401,6 +401,56 @@ func (m *Manager) GenericTemplateFuncs() template.FuncMap {
 	return m.tplFuncs
 }
 
+// DripTemplateFuncs returns the template functions for drip campaign messages.
+// It mirrors TemplateFuncs() but uses DripMessage as the dot context instead of CampaignMessage.
+// stepUUID is used as the tracking identifier so the fallback handlers can identify drip opens/clicks.
+func (m *Manager) DripTemplateFuncs(campUUID, stepUUID string) template.FuncMap {
+	f := template.FuncMap{
+		"TrackLink": func(url string, msg *DripMessage) string {
+			if m.cfg.DisableTracking {
+				return url
+			}
+			subUUID := msg.Subscriber.UUID
+			if !m.cfg.IndividualTracking {
+				subUUID = dummyUUID
+			}
+			return m.trackLink(url, stepUUID, subUUID)
+		},
+		"TrackView": func(msg *DripMessage) template.HTML {
+			if m.cfg.DisableTracking {
+				return template.HTML("")
+			}
+			subUUID := msg.Subscriber.UUID
+			if !m.cfg.IndividualTracking {
+				subUUID = dummyUUID
+			}
+			return template.HTML(fmt.Sprintf(`<img src="%s" alt="" />`,
+				fmt.Sprintf(m.cfg.ViewTrackURL, stepUUID, subUUID)))
+		},
+		"UnsubscribeURL": func(msg *DripMessage) string {
+			return fmt.Sprintf(m.cfg.UnsubURL, campUUID, msg.Subscriber.UUID)
+		},
+		"ManageURL": func(msg *DripMessage) string {
+			return fmt.Sprintf(m.cfg.UnsubURL, campUUID, msg.Subscriber.UUID) + "?manage=true"
+		},
+		"OptinURL": func(msg *DripMessage) string {
+			return fmt.Sprintf(m.cfg.OptinURL, msg.Subscriber.UUID, "")
+		},
+		"MessageURL": func(msg *DripMessage) string {
+			return ""
+		},
+		"ArchiveURL": func() string {
+			return m.cfg.ArchiveURL
+		},
+		"RootURL": func() string {
+			return m.cfg.RootURL
+		},
+	}
+
+	maps.Copy(f, m.tplFuncs)
+	return f
+}
+
 // StopCampaign marks a running campaign as stopped so that all its queued messages are ignored.
 func (m *Manager) StopCampaign(id int) {
 	m.pipesMut.RLock()

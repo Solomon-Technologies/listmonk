@@ -46,6 +46,10 @@
             <smtp-settings :form="form" :key="key" />
           </b-tab-item><!-- mail servers -->
 
+          <b-tab-item label="Domains &amp; Senders">
+            <domain-settings :form="form" :key="key" />
+          </b-tab-item><!-- domains & senders -->
+
           <b-tab-item :label="$t('settings.bounces.name')">
             <bounce-settings :form="form" :key="key" />
           </b-tab-item><!-- bounces -->
@@ -80,6 +84,7 @@ import PrivacySettings from './settings/privacy.vue';
 import SecuritySettings from './settings/security.vue';
 import SmtpSettings from './settings/smtp.vue';
 import CrmSettings from './settings/crm.vue';
+import DomainSettings from './settings/domains.vue';
 
 export default Vue.extend({
   components: {
@@ -93,6 +98,7 @@ export default Vue.extend({
     MessengerSettings,
     AppearanceSettings,
     CrmSettings,
+    DomainSettings,
   },
 
   data() {

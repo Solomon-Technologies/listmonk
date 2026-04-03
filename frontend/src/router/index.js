@@ -204,6 +204,38 @@ const routes = [
     component: () => import('../views/Scoring.vue'),
   },
 
+  // Email Warming
+  {
+    path: '/warming',
+    name: 'warmingCampaigns',
+    meta: { title: 'Warming Campaigns', group: 'warming' },
+    component: () => import('../views/WarmingCampaigns.vue'),
+  },
+  {
+    path: '/warming/recipients',
+    name: 'warmingRecipients',
+    meta: { title: 'Warming Recipients', group: 'warming' },
+    component: () => import('../views/WarmingRecipients.vue'),
+  },
+  {
+    path: '/warming/senders',
+    name: 'warmingSenders',
+    meta: { title: 'Warming Senders', group: 'warming' },
+    component: () => import('../views/WarmingSenders.vue'),
+  },
+  {
+    path: '/warming/templates',
+    name: 'warmingTemplates',
+    meta: { title: 'Warming Templates', group: 'warming' },
+    component: () => import('../views/WarmingTemplates.vue'),
+  },
+  {
+    path: '/warming/log',
+    name: 'warmingSendLog',
+    meta: { title: 'Warming Send Log', group: 'warming' },
+    component: () => import('../views/WarmingSendLog.vue'),
+  },
+
   // CRM - Deals
   {
     path: '/deals',

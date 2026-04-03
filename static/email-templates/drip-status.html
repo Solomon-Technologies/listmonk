@@ -1,0 +1,29 @@
+{{ define "drip-status" }}
+{{ template "header" . }}
+<h2>Drip Campaign Report</h2>
+<table width="100%">
+    <tr>
+        <td width="30%"><strong>Campaign</strong></td>
+        <td>{{ index . "Name" }}</td>
+    </tr>
+    <tr>
+        <td width="30%"><strong>Status</strong></td>
+        <td>{{ index . "Status" }}</td>
+    </tr>
+    <tr>
+        <td width="30%"><strong>Sent this batch</strong></td>
+        <td>{{ index . "Sent" }}</td>
+    </tr>
+    <tr>
+        <td width="30%"><strong>Failed this batch</strong></td>
+        <td>{{ index . "Failed" }}</td>
+    </tr>
+    {{ if ne (index . "Reason") "" }}
+        <tr>
+            <td width="30%"><strong>Note</strong></td>
+            <td>{{ index . "Reason" }}</td>
+        </tr>
+    {{ end }}
+</table>
+{{ template "footer" }}
+{{ end }}

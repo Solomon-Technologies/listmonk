@@ -1,12 +1,14 @@
 package core
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v4"
+	"github.com/lib/pq"
 )
 
 var dripQuerySortFields = []string{"name", "status", "created_at", "updated_at"}
@@ -93,7 +95,7 @@ func (c *Core) UpdateDripCampaign(id int, o models.DripCampaign) (models.DripCam
 		o.TriggerConfig = []byte("{}")
 	}
 
-	res, err := c.q.UpdateDripCampaign.Exec(id, o.Name, o.Description, o.Status, o.TriggerType, o.TriggerConfig, o.SegmentID, o.FromEmail)
+	res, err := c.q.UpdateDripCampaign.Exec(id, o.Name, o.Description, o.Status, o.TriggerType, o.TriggerConfig, o.SegmentID, o.FromEmail, o.MaxSendPerDay)
 	if err != nil {
 		c.log.Printf("error updating drip campaign: %v", err)
 		return models.DripCampaign{}, echo.NewHTTPError(http.StatusInternalServerError,
@@ -317,6 +319,152 @@ func (c *Core) GetActiveDripsByTrigger(triggerType string) (models.DripCampaigns
 		return nil, err
 	}
 	return out, nil
+}
+
+// GetDripSendsToday returns the number of sends for a drip campaign today.
+func (c *Core) GetDripSendsToday(dripCampaignID int) (int, error) {
+	var count int
+	if err := c.q.GetDripSendsToday.Get(&count, dripCampaignID); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// UpdateDripStepSent increments the sent counter for a drip step.
+func (c *Core) UpdateDripStepSent(stepID int) error {
+	_, err := c.q.UpdateDripStepSent.Exec(stepID)
+	return err
+}
+
+// UpdateDripStepOpened increments the opened counter for a drip step.
+func (c *Core) UpdateDripStepOpened(stepID int) error {
+	_, err := c.q.UpdateDripStepOpened.Exec(stepID)
+	return err
+}
+
+// UpdateDripStepClicked increments the clicked counter for a drip step.
+func (c *Core) UpdateDripStepClicked(stepID int) error {
+	_, err := c.q.UpdateDripStepClicked.Exec(stepID)
+	return err
+}
+
+// UpdateDripCampaignEntered increments the total_entered counter for a drip campaign.
+func (c *Core) UpdateDripCampaignEntered(campaignID int) error {
+	_, err := c.q.UpdateDripCampaignEntered.Exec(campaignID)
+	return err
+}
+
+// UpdateDripCampaignCompleted increments the total_completed counter for a drip campaign.
+func (c *Core) UpdateDripCampaignCompleted(campaignID int) error {
+	_, err := c.q.UpdateDripCampaignCompleted.Exec(campaignID)
+	return err
+}
+
+// BulkEnrollInDrip enrolls multiple subscribers in a drip campaign at step 1.
+func (c *Core) BulkEnrollInDrip(dripCampaignID int, subscriberIDs []int) (int, error) {
+	steps, err := c.GetDripSteps(dripCampaignID)
+	if err != nil {
+		return 0, err
+	}
+	if len(steps) == 0 {
+		return 0, echo.NewHTTPError(http.StatusBadRequest, "drip campaign has no steps")
+	}
+
+	firstStep := steps[0]
+	nextSendAt := calculateNextSend(firstStep.DelayValue, firstStep.DelayUnit)
+
+	res, err := c.q.BulkEnrollInDrip.Exec(dripCampaignID, firstStep.ID, nextSendAt, pq.Array(subscriberIDs))
+	if err != nil {
+		c.log.Printf("error bulk enrolling in drip %d: %v", dripCampaignID, err)
+		return 0, echo.NewHTTPError(http.StatusInternalServerError,
+			c.i18n.Ts("globals.messages.errorCreating", "name", "drip enrollments", "error", pqErrMsg(err)))
+	}
+
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
+// RegisterDripStepOpened finds a drip step by UUID and increments its opened counter.
+func (c *Core) RegisterDripStepOpened(stepUUID string) error {
+	var step models.DripStep
+	if err := c.q.GetDripStepByUUID.Get(&step, stepUUID); err != nil {
+		return err
+	}
+	return c.UpdateDripStepOpened(step.ID)
+}
+
+// RegisterDripStepClicked finds a drip step by UUID and increments its clicked counter.
+func (c *Core) RegisterDripStepClicked(stepUUID string) error {
+	var step models.DripStep
+	if err := c.q.GetDripStepByUUID.Get(&step, stepUUID); err != nil {
+		return err
+	}
+	return c.UpdateDripStepClicked(step.ID)
+}
+
+// CheckDripTriggers checks if any active drip campaigns match the given trigger
+// and auto-enrolls the subscriber. triggerType is "subscription" or "tag_added".
+// contextIDs are list IDs for subscription triggers; contextTags are tag names for tag triggers.
+func (c *Core) CheckDripTriggers(triggerType string, subscriberID int, contextIDs []int, contextTags []string) {
+	drips, err := c.GetActiveDripsByTrigger(triggerType)
+	if err != nil || len(drips) == 0 {
+		return
+	}
+
+	for _, d := range drips {
+		if !c.matchesTriggerConfig(d, triggerType, contextIDs, contextTags) {
+			continue
+		}
+
+		// Enroll the subscriber (ignores duplicates via ON CONFLICT DO NOTHING).
+		if err := c.EnrollSubscriberInDrip(d.ID, subscriberID); err != nil {
+			c.log.Printf("error auto-enrolling subscriber %d in drip %d: %v", subscriberID, d.ID, err)
+		}
+	}
+}
+
+// matchesTriggerConfig checks if a drip campaign's trigger config matches the given context.
+func (c *Core) matchesTriggerConfig(d models.DripCampaign, triggerType string, contextIDs []int, contextTags []string) bool {
+	var cfg map[string]json.RawMessage
+	if err := json.Unmarshal(d.TriggerConfig, &cfg); err != nil {
+		return false
+	}
+
+	switch triggerType {
+	case models.DripTriggerSubscription:
+		raw, ok := cfg["list_ids"]
+		if !ok {
+			return false
+		}
+		var listIDs []int
+		if err := json.Unmarshal(raw, &listIDs); err != nil {
+			return false
+		}
+		for _, cID := range contextIDs {
+			for _, lID := range listIDs {
+				if cID == lID {
+					return true
+				}
+			}
+		}
+
+	case models.DripTriggerTagAdded:
+		raw, ok := cfg["tag"]
+		if !ok {
+			return false
+		}
+		var tag string
+		if err := json.Unmarshal(raw, &tag); err != nil {
+			return false
+		}
+		for _, t := range contextTags {
+			if t == tag {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // calculateNextSend calculates the next send time based on delay value and unit.

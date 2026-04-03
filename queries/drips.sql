@@ -28,6 +28,7 @@ UPDATE drip_campaigns SET
     trigger_config=$6,
     segment_id=$7,
     from_email=$8,
+    max_send_per_day=$9,
     updated_at=NOW()
 WHERE id = $1 RETURNING id;
 
@@ -80,11 +81,15 @@ SELECT e.id AS enrollment_id, e.drip_campaign_id, e.subscriber_id, e.current_ste
     s.attribs AS subscriber_attribs, s.status AS subscriber_status,
     ds.subject, ds.body, ds.alt_body, ds.from_email AS step_from_email,
     ds.content_type, ds.template_id, ds.messenger, ds.headers,
-    dc.from_email AS campaign_from_email, dc.name AS campaign_name
+    ds.uuid AS step_uuid,
+    dc.from_email AS campaign_from_email, dc.name AS campaign_name,
+    dc.uuid AS campaign_uuid, dc.max_send_per_day,
+    COALESCE(t.body, '') AS template_body
 FROM drip_enrollments e
 JOIN subscribers s ON s.id = e.subscriber_id
 JOIN drip_steps ds ON ds.id = e.current_step_id
 JOIN drip_campaigns dc ON dc.id = e.drip_campaign_id
+LEFT JOIN templates t ON t.id = ds.template_id
 WHERE e.status = 'active'
     AND e.next_send_at <= NOW()
     AND s.status != 'blocklisted'
@@ -122,3 +127,32 @@ INSERT INTO drip_send_log (drip_campaign_id, drip_step_id, subscriber_id, status
 
 -- name: get-active-drips-by-trigger
 SELECT * FROM drip_campaigns WHERE status = 'active' AND trigger_type = $1::drip_trigger_type;
+
+-- name: get-drip-sends-today
+SELECT COUNT(*) FROM drip_send_log WHERE drip_campaign_id = $1 AND sent_at >= CURRENT_DATE AND status = 'sent';
+
+-- name: update-drip-step-sent
+UPDATE drip_steps SET sent = sent + 1, updated_at = NOW() WHERE id = $1;
+
+-- name: update-drip-step-opened
+UPDATE drip_steps SET opened = opened + 1, updated_at = NOW() WHERE id = $1;
+
+-- name: update-drip-step-clicked
+UPDATE drip_steps SET clicked = clicked + 1, updated_at = NOW() WHERE id = $1;
+
+-- name: update-drip-campaign-entered
+UPDATE drip_campaigns SET total_entered = total_entered + 1, updated_at = NOW() WHERE id = $1;
+
+-- name: update-drip-campaign-completed
+UPDATE drip_campaigns SET total_completed = total_completed + 1, updated_at = NOW() WHERE id = $1;
+
+-- name: bulk-enroll-in-drip
+INSERT INTO drip_enrollments (drip_campaign_id, subscriber_id, status, current_step_id, next_send_at)
+    SELECT $1, unnest($4::INT[]), 'active', $2, $3
+    ON CONFLICT (drip_campaign_id, subscriber_id) DO NOTHING;
+
+-- name: get-drip-campaign-by-uuid
+SELECT * FROM drip_campaigns WHERE uuid = $1::UUID;
+
+-- name: get-drip-step-by-uuid
+SELECT * FROM drip_steps WHERE uuid = $1::UUID;

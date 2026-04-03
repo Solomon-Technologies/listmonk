@@ -345,6 +345,11 @@ func (c *Core) InsertSubscriber(sub models.Subscriber, listIDs []int, listUUIDs 
 		hasOptin = num > 0
 	}
 
+	// Check drip campaign auto-enrollment triggers for list subscriptions.
+	if len(listIDs) > 0 {
+		go c.CheckDripTriggers("subscription", out.ID, listIDs, nil)
+	}
+
 	return out, hasOptin, nil
 }
 
@@ -432,6 +437,11 @@ func (c *Core) UpdateSubscriberWithLists(id int, sub models.Subscriber, listIDs 
 			return out, hasOptin, err
 		}
 		hasOptin = num > 0
+	}
+
+	// Check drip campaign auto-enrollment triggers for list subscriptions.
+	if len(listIDs) > 0 {
+		go c.CheckDripTriggers("subscription", out.ID, listIDs, nil)
 	}
 
 	return out, hasOptin, nil

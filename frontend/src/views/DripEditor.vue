@@ -59,6 +59,20 @@
             </b-field>
           </div>
 
+          <b-field label="From email (optional)"
+            message="Select a verified warming sender or leave blank for default">
+            <b-select v-model="drip.fromEmail" expanded>
+              <option value="">Default sender</option>
+              <option v-for="s in warmingSenders" :key="s.id" :value="s.email">
+                {{ s.name }} ({{ s.email }})
+              </option>
+            </b-select>
+          </b-field>
+          <b-field label="Max sends per day">
+            <b-numberinput v-model="drip.maxSendPerDay" :min="0" :step="1"
+              placeholder="0 = unlimited" controls-position="compact" />
+          </b-field>
+
           <hr />
           <div class="fields stats">
             <p><span class="has-text-weight-semibold">Entered:</span> <span>{{ $utils.formatNumber(drip.totalEntered || 0) }}</span></p>
@@ -127,7 +141,17 @@
 
         <!-- Enrollments -->
         <div class="box">
-          <h3 class="title is-5">Enrollments</h3>
+          <div class="columns is-vcentered">
+            <div class="column">
+              <h3 class="title is-5">Enrollments</h3>
+            </div>
+            <div class="column has-text-right">
+              <b-button type="is-primary" size="is-small" icon-left="account-multiple-plus-outline"
+                @click="isBulkEnrollVisible = true">
+                Bulk Enroll
+              </b-button>
+            </div>
+          </div>
           <b-table :data="enrollments" :loading="enrollmentsLoading" hoverable>
             <b-table-column v-slot="props" field="email" label="Subscriber">
               <router-link :to="{ name: 'subscriber', params: { id: props.row.subscriberId } }">
@@ -187,8 +211,14 @@
           <b-field label="Subject line">
             <b-input v-model="stepForm.subject" placeholder="Email subject" required />
           </b-field>
-          <b-field label="From email (optional)">
-            <b-input v-model="stepForm.fromEmail" placeholder="Leave blank for default" />
+          <b-field label="From email (optional)"
+            message="Select a verified warming sender or leave blank for default">
+            <b-select v-model="stepForm.fromEmail" expanded>
+              <option value="">Default sender</option>
+              <option v-for="s in warmingSenders" :key="s.id" :value="s.email">
+                {{ s.name }} ({{ s.email }})
+              </option>
+            </b-select>
           </b-field>
           <b-field label="Content type">
             <b-select v-model="stepForm.contentType" expanded>
@@ -206,6 +236,28 @@
         <footer class="modal-card-foot has-text-right">
           <b-button @click="isStepEditorVisible = false">Cancel</b-button>
           <b-button type="is-primary" @click="saveStep" :loading="savingStep">Save</b-button>
+        </footer>
+      </div>
+    </b-modal>
+
+    <!-- Bulk enroll modal -->
+    <b-modal v-model="isBulkEnrollVisible" :width="500" scroll="keep" has-modal-card>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <p class="modal-card-title">Bulk Enroll Subscribers</p>
+          <button type="button" class="delete" @click="isBulkEnrollVisible = false" />
+        </header>
+        <section class="modal-card-body">
+          <b-field label="Subscriber IDs" message="Enter comma-separated subscriber IDs">
+            <b-input v-model="bulkEnrollIds" type="textarea" rows="4"
+              placeholder="1, 2, 3, 45, 67" />
+          </b-field>
+        </section>
+        <footer class="modal-card-foot has-text-right">
+          <b-button @click="isBulkEnrollVisible = false">Cancel</b-button>
+          <b-button type="is-primary" @click="bulkEnroll" :loading="bulkEnrolling">
+            Enroll
+          </b-button>
         </footer>
       </div>
     </b-modal>
@@ -233,6 +285,12 @@ export default Vue.extend({
       isEditingStep: false,
       editingStepId: null,
       stepForm: this.getEmptyStepForm(),
+
+      isBulkEnrollVisible: false,
+      bulkEnrolling: false,
+      bulkEnrollIds: '',
+
+      warmingSenders: [],
     };
   },
 
@@ -294,6 +352,8 @@ export default Vue.extend({
         trigger_type: this.drip.triggerType,
         trigger_config: triggerConfig,
         status: this.drip.status,
+        from_email: this.drip.fromEmail || '',
+        max_send_per_day: this.drip.maxSendPerDay || 0,
       }).then(() => {
         this.$utils.toast('Drip campaign saved');
         this.saving = false;
@@ -368,6 +428,34 @@ export default Vue.extend({
       });
     },
 
+    bulkEnroll() {
+      const ids = this.bulkEnrollIds
+        .split(/[,\s]+/)
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => n > 0);
+
+      if (ids.length === 0) {
+        this.$utils.toast('Enter at least one valid subscriber ID', 'is-danger');
+        return;
+      }
+
+      this.bulkEnrolling = true;
+      const dripId = parseInt(this.$route.params.id, 10);
+      this.$api.bulkEnrollInDrip(dripId, ids).then((data) => {
+        this.$utils.toast(`Enrolled ${data.enrolled} subscriber(s)`);
+        this.isBulkEnrollVisible = false;
+        this.bulkEnrollIds = '';
+        this.bulkEnrolling = false;
+        this.getEnrollments();
+      }).catch(() => { this.bulkEnrolling = false; });
+    },
+
+    getSenders() {
+      this.$api.getWarmingSenders().then((data) => {
+        this.warmingSenders = data || [];
+      });
+    },
+
     getStepIndex(stepId) {
       const idx = this.steps.findIndex((s) => s.id === stepId);
       return idx >= 0 ? idx + 1 : '?';
@@ -390,6 +478,7 @@ export default Vue.extend({
     this.getDrip();
     this.getSteps();
     this.getEnrollments();
+    this.getSenders();
   },
 });
 </script>

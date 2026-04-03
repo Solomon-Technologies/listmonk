@@ -19,6 +19,7 @@ import (
 const (
 	TplImport          = "import-status"
 	TplCampaignStatus  = "campaign-status"
+	TplDripStatus      = "drip-status"
 	TplSubscriberOptin = "subscriber-optin"
 	TplSubscriberData  = "subscriber-data"
 	TplForgotPassword  = "forgot-password"

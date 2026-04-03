@@ -1,6 +1,7 @@
 package models
 
 import (
+	"bytes"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -86,6 +87,24 @@ var markdown = goldmark.New(
 		),
 	),
 )
+
+// ApplyTplFuncReplacements applies regex replacements for template shorthand functions
+// (e.g., {{ TrackLink "url" }} to {{ TrackLink "url" . }}).
+func ApplyTplFuncReplacements(s string) string {
+	for _, r := range regTplFuncs {
+		s = r.regExp.ReplaceAllString(s, r.replace)
+	}
+	return s
+}
+
+// ConvertMarkdown converts Markdown text to HTML bytes.
+func ConvertMarkdown(src []byte) ([]byte, error) {
+	var b bytes.Buffer
+	if err := markdown.Convert(src, &b); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
+}
 
 // Headers represents an array of string maps used to represent SMTP, HTTP headers etc.
 // similar to url.Values{}
