@@ -559,6 +559,12 @@ func (a *App) LinkRedirect(c echo.Context) error {
 		return c.Render(e.Code, tplMessage, makeMsgTpl(a.i18n.T("public.errorTitle"), "", e.Error()))
 	}
 
+	// Solomon fork: dispatch campaign.click webhook event so downstream CRMs
+	// (Odoo) can move the lead straight to 'hot'. Non-blocking.
+	if a.webhookMgr != nil && subUUID != "" && campUUID != dummyUUID && subUUID != dummyUUID {
+		go a.dispatchCampaignEngagement("campaign.click", campUUID, subUUID, url)
+	}
+
 	// Also try to record the click for drip step tracking (campUUID may be a step UUID).
 	_ = a.core.RegisterDripStepClicked(campUUID)
 
@@ -588,11 +594,48 @@ func (a *App) RegisterCampaignView(c echo.Context) error {
 		if err := a.core.RegisterCampaignView(campUUID, subUUID); err != nil {
 			// Fallback: campUUID might be a drip step UUID. Try drip step tracking.
 			_ = a.core.RegisterDripStepOpened(campUUID)
+		} else if a.webhookMgr != nil && subUUID != "" {
+			// Solomon fork: dispatch campaign.view webhook event with enriched
+			// payload so external systems (Odoo, etc.) can drive bucket
+			// transitions on opens. Non-blocking (drops on queue-full).
+			go a.dispatchCampaignEngagement("campaign.view", campUUID, subUUID, "")
 		}
 	}
 
 	c.Response().Header().Set("Cache-Control", "no-cache")
 	return c.Blob(http.StatusOK, "image/png", pixelPNG)
+}
+
+// dispatchCampaignEngagement looks up subscriber + campaign names so the
+// webhook payload is directly actionable by downstream CRMs (subscriber_email
+// is the match key for Odoo crm.lead.email_from). Runs async — failures are
+// logged but don't block the handler.
+func (a *App) dispatchCampaignEngagement(event, campUUID, subUUID, clickURL string) {
+	if a.webhookMgr == nil || campUUID == "" || subUUID == "" {
+		return
+	}
+	sub, err := a.core.GetSubscriber(0, subUUID, "")
+	if err != nil {
+		a.log.Printf("webhook %s: subscriber lookup failed for uuid=%s: %v", event, subUUID, err)
+		return
+	}
+	camp, err := a.core.GetCampaign(0, campUUID, "")
+	if err != nil {
+		// Drip step UUIDs land here too — swallow quietly, drips fire their own events.
+		return
+	}
+	payload := map[string]any{
+		"campaign_id":      camp.ID,
+		"campaign_uuid":    campUUID,
+		"campaign_name":    camp.Name,
+		"subscriber_id":    sub.ID,
+		"subscriber_uuid":  subUUID,
+		"subscriber_email": sub.Email,
+	}
+	if clickURL != "" {
+		payload["url"] = clickURL
+	}
+	a.webhookMgr.Dispatch(event, payload)
 }
 
 // SelfExportSubscriberData pulls the subscriber's profile, list subscriptions,

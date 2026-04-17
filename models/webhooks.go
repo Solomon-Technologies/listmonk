@@ -58,6 +58,8 @@ var WebhookEvents = map[string]bool{
 	"subscriber.unsubscribed": true,
 	"campaign.started":        true,
 	"campaign.finished":       true,
+	"campaign.view":           true,
+	"campaign.click":          true,
 	"bounce.received":         true,
 	"drip.enrolled":           true,
 	"drip.step_sent":          true,
