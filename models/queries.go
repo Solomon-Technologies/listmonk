@@ -87,8 +87,11 @@ type Queries struct {
 	UpdateCampaignStatus     *sqlx.Stmt `query:"update-campaign-status"`
 	UpdateCampaignCounts     *sqlx.Stmt `query:"update-campaign-counts"`
 	UpdateCampaignArchive    *sqlx.Stmt `query:"update-campaign-archive"`
-	RegisterCampaignView     *sqlx.Stmt `query:"register-campaign-view"`
-	DeleteCampaign           *sqlx.Stmt `query:"delete-campaign"`
+	RegisterCampaignView      *sqlx.Stmt `query:"register-campaign-view"`
+	InsertCampaignSendLog     *sqlx.Stmt `query:"insert-campaign-send-log"`
+	QueryCampaignSendLog      *sqlx.Stmt `query:"query-campaign-send-log"`
+	QueryCampaignSendLogStats *sqlx.Stmt `query:"query-campaign-send-log-stats"`
+	DeleteCampaign            *sqlx.Stmt `query:"delete-campaign"`
 	DeleteCampaigns          *sqlx.Stmt `query:"delete-campaigns"`
 
 	InsertMedia *sqlx.Stmt `query:"insert-media"`

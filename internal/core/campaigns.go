@@ -435,6 +435,53 @@ func (c *Core) RegisterCampaignView(campUUID, subUUID string) error {
 	return nil
 }
 
+// InsertCampaignSendLog records a per-recipient send attempt. Called by the
+// manager right after messenger.Push() returns so admins can see who got what
+// when (and what failed) in the "Send Log" UI tab. errMsg is empty string for
+// status='sent' — the query stores NULL in that case.
+func (c *Core) InsertCampaignSendLog(campaignID, subscriberID int, email, messenger, status, errMsg string) error {
+	if _, err := c.q.InsertCampaignSendLog.Exec(campaignID, subscriberID, email, messenger, status, errMsg); err != nil {
+		c.log.Printf("error inserting campaign send log: %s", err)
+		return err
+	}
+	return nil
+}
+
+// QueryCampaignSendLog returns a paginated list of send records for a campaign
+// with optional email + status filters. total is the full match count.
+func (c *Core) QueryCampaignSendLog(campaignID int, emailFilter, statusFilter string, limit, offset int) ([]models.CampaignSendLogEntry, int, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	rows := []models.CampaignSendLogEntry{}
+	if err := c.q.QueryCampaignSendLog.Select(&rows, campaignID, emailFilter, statusFilter, limit, offset); err != nil {
+		c.log.Printf("error querying campaign send log: %s", err)
+		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
+			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.campaign}", "error", pqErrMsg(err)))
+	}
+
+	total := 0
+	if len(rows) > 0 {
+		total = rows[0].Total
+	}
+	return rows, total, nil
+}
+
+// QueryCampaignSendLogStats returns header aggregates for the Send Log tab.
+func (c *Core) QueryCampaignSendLogStats(campaignID int) (models.CampaignSendLogStats, error) {
+	out := models.CampaignSendLogStats{}
+	if err := c.q.QueryCampaignSendLogStats.Get(&out, campaignID); err != nil {
+		c.log.Printf("error querying campaign send log stats: %s", err)
+		return out, echo.NewHTTPError(http.StatusInternalServerError,
+			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.campaign}", "error", pqErrMsg(err)))
+	}
+	return out, nil
+}
+
 // GetLinkURL returns the original URL for a link UUID without recording a click.
 func (c *Core) GetLinkURL(linkUUID string) (string, error) {
 	var url string

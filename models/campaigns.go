@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"strings"
 	txttpl "text/template"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
@@ -231,4 +232,29 @@ func (c *Campaign) ConvertContent(from, to string) (string, error) {
 	}
 
 	return out, nil
+}
+
+// CampaignSendLogEntry is one row from campaign_send_log, joined with
+// subscribers for display. Used by the "Send Log" UI tab.
+type CampaignSendLogEntry struct {
+	ID              int64     `db:"id" json:"id"`
+	CampaignID      int       `db:"campaign_id" json:"campaign_id"`
+	SubscriberID    int       `db:"subscriber_id" json:"subscriber_id"`
+	SubscriberUUID  null.String `db:"subscriber_uuid" json:"subscriber_uuid"`
+	SubscriberEmail string    `db:"subscriber_email" json:"subscriber_email"`
+	SubscriberName  null.String `db:"subscriber_name" json:"subscriber_name"`
+	SentAt          time.Time `db:"sent_at" json:"sent_at"`
+	Messenger       string    `db:"messenger" json:"messenger"`
+	Status          string    `db:"status" json:"status"`
+	ErrorMessage    null.String `db:"error_message" json:"error_message"`
+	Total           int       `db:"total" json:"-"`
+}
+
+// CampaignSendLogStats is the header aggregate for the Send Log tab.
+type CampaignSendLogStats struct {
+	TotalLogged int         `db:"total_logged" json:"total_logged"`
+	TotalSent   int         `db:"total_sent" json:"total_sent"`
+	TotalFailed int         `db:"total_failed" json:"total_failed"`
+	FirstSentAt null.Time   `db:"first_sent_at" json:"first_sent_at"`
+	LastSentAt  null.Time   `db:"last_sent_at" json:"last_sent_at"`
 }

@@ -456,3 +456,34 @@ WITH view AS (
 INSERT INTO campaign_views (campaign_id, subscriber_id)
     VALUES((SELECT campaign_id FROM view), (SELECT subscriber_id FROM view));
 
+-- name: insert-campaign-send-log
+-- Solomon fork: per-recipient send record written by the manager right after
+-- the messenger Push returns. status='sent' on success, 'failed' on error.
+INSERT INTO campaign_send_log (campaign_id, subscriber_id, subscriber_email, messenger, status, error_message)
+VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''));
+
+-- name: query-campaign-send-log
+-- Paginated send log for a specific campaign. Supports optional email filter.
+SELECT csl.id, csl.campaign_id, csl.subscriber_id, csl.subscriber_email,
+       csl.sent_at, csl.messenger, csl.status, csl.error_message,
+       s.uuid AS subscriber_uuid, s.name AS subscriber_name,
+       COUNT(*) OVER () AS total
+FROM campaign_send_log csl
+LEFT JOIN subscribers s ON s.id = csl.subscriber_id
+WHERE csl.campaign_id = $1
+  AND ($2 = '' OR csl.subscriber_email ILIKE '%' || $2 || '%')
+  AND ($3 = '' OR csl.status = $3)
+ORDER BY csl.sent_at DESC, csl.id DESC
+LIMIT $4 OFFSET $5;
+
+-- name: query-campaign-send-log-stats
+-- Aggregate counts for the header stats on the Send Log tab.
+SELECT
+    COUNT(*)                                          AS total_logged,
+    COUNT(*) FILTER (WHERE status = 'sent')           AS total_sent,
+    COUNT(*) FILTER (WHERE status = 'failed')         AS total_failed,
+    MIN(sent_at)                                      AS first_sent_at,
+    MAX(sent_at)                                      AS last_sent_at
+FROM campaign_send_log
+WHERE campaign_id = $1;
+

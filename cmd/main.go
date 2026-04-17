@@ -265,6 +265,16 @@ func main() {
 	// Start cronjobs.
 	initCron(core, db)
 
+	// Solomon fork: wire the send-log callback so every messenger Push() during
+	// a campaign send writes a campaign_send_log row (powers Campaign > Send Log
+	// UI tab). Callback runs as a goroutine from the manager; an insert failure
+	// only logs and never blocks delivery.
+	mgr.SetSendLogger(func(campaignID, subscriberID int, email, messenger, status, errMsg string) {
+		if err := core.InsertCampaignSendLog(campaignID, subscriberID, email, messenger, status, errMsg); err != nil {
+			lo.Printf("send-log insert failed for campaign=%d sub=%d: %v", campaignID, subscriberID, err)
+		}
+	})
+
 	// Start the campaign manager workers. The campaign batches (fetch from DB, push out
 	// messages) get processed at the specified interval.
 	go mgr.Run()

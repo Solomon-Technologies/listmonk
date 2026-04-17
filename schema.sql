@@ -165,6 +165,24 @@ DROP INDEX IF EXISTS idx_views_camp_id; CREATE INDEX idx_views_camp_id ON campai
 DROP INDEX IF EXISTS idx_views_subscriber_id; CREATE INDEX idx_views_subscriber_id ON campaign_views(subscriber_id);
 DROP INDEX IF EXISTS idx_views_date; CREATE INDEX idx_views_date ON campaign_views(created_at);
 
+-- campaign_send_log: Solomon fork — per-recipient send record written by the
+-- manager immediately after messenger.Push(). Records every attempted delivery
+-- for the "Send Log" UI tab, independent of open/click tracking.
+DROP TABLE IF EXISTS campaign_send_log CASCADE;
+CREATE TABLE campaign_send_log (
+    id               BIGSERIAL PRIMARY KEY,
+    campaign_id      INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    subscriber_id    INTEGER NOT NULL REFERENCES subscribers(id) ON DELETE CASCADE,
+    subscriber_email TEXT NOT NULL,
+    sent_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    messenger        TEXT NOT NULL DEFAULT '',
+    status           TEXT NOT NULL DEFAULT 'sent',
+    error_message    TEXT
+);
+DROP INDEX IF EXISTS idx_csl_campaign; CREATE INDEX idx_csl_campaign ON campaign_send_log(campaign_id, sent_at DESC);
+DROP INDEX IF EXISTS idx_csl_subscriber; CREATE INDEX idx_csl_subscriber ON campaign_send_log(subscriber_id, sent_at DESC);
+DROP INDEX IF EXISTS idx_csl_sent_at; CREATE INDEX idx_csl_sent_at ON campaign_send_log(sent_at DESC);
+
 -- media
 DROP TABLE IF EXISTS media CASCADE;
 CREATE TABLE media (

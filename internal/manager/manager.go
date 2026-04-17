@@ -68,6 +68,11 @@ type Manager struct {
 	fnNotify   func(subject string, data any) error
 	log        *log.Logger
 
+	// Solomon fork: optional callback invoked after each messenger.Push() for
+	// campaign sends. Powers the Campaign > Send Log UI tab. Set via
+	// SetSendLogger from cmd/init.go — nil-safe (skipped if unset).
+	sendLogger func(campaignID, subscriberID int, email, messenger, status, errMsg string)
+
 	// Campaigns that are currently running.
 	pipes    map[int]*pipe
 	pipesMut sync.RWMutex
@@ -189,6 +194,14 @@ func (m *Manager) AddMessenger(msg Messenger) error {
 	m.messengers[id] = msg
 
 	return nil
+}
+
+// SetSendLogger wires an optional callback invoked after each messenger
+// Push() during a campaign send. The callback persists the attempt to
+// campaign_send_log (see core.InsertCampaignSendLog). Nil is a valid value.
+// Solomon fork — powers the Campaign > Send Log UI tab.
+func (m *Manager) SetSendLogger(fn func(campaignID, subscriberID int, email, messenger, status, errMsg string)) {
+	m.sendLogger = fn
 }
 
 // PushMessage pushes an arbitrary non-campaign Message to be sent out by the workers.
@@ -573,6 +586,26 @@ func (m *Manager) worker() {
 			err := m.messengers[msg.Campaign.Messenger].Push(out)
 			if err != nil {
 				m.log.Printf("error sending message in campaign %s: subscriber %d: %v", msg.Campaign.Name, msg.Subscriber.ID, err)
+			}
+
+			// Solomon fork: per-recipient send log for the Campaign > Send Log
+			// UI tab + GET /api/campaigns/:id/send-log. Non-blocking insert
+			// (best-effort; a failure here does not impact delivery).
+			if m.sendLogger != nil {
+				status := "sent"
+				errMsg := ""
+				if err != nil {
+					status = "failed"
+					errMsg = err.Error()
+				}
+				go m.sendLogger(
+					int(msg.Campaign.ID),
+					msg.Subscriber.ID,
+					msg.Subscriber.Email,
+					msg.Campaign.Messenger,
+					status,
+					errMsg,
+				)
 			}
 
 			// Increment the send rate or the error counter if there was an error.

@@ -832,3 +832,58 @@ func canEditCampaign(status string) bool {
 		status == models.CampaignStatusPaused ||
 		status == models.CampaignStatusScheduled
 }
+
+// GetCampaignSendLog returns paginated send records for the campaign.
+// Query params: per_page (default 50, max 500), page (default 1),
+// email (substring filter), status ('' | 'sent' | 'failed').
+// Solomon fork — powers the Campaign > Send Log UI tab.
+func (a *App) GetCampaignSendLog(c echo.Context) error {
+	id := getID(c)
+
+	if err := a.checkCampaignPerm(auth.PermTypeGet, id, c); err != nil {
+		return err
+	}
+
+	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+	if perPage <= 0 {
+		perPage = 50
+	}
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	if page < 1 {
+		page = 1
+	}
+	offset := (page - 1) * perPage
+	email := strings.TrimSpace(c.QueryParam("email"))
+	status := strings.TrimSpace(c.QueryParam("status"))
+	if status != "" && status != "sent" && status != "failed" {
+		status = ""
+	}
+
+	rows, total, err := a.core.QueryCampaignSendLog(id, email, status, perPage, offset)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, okResp{struct {
+		Results  []models.CampaignSendLogEntry `json:"results"`
+		Total    int                           `json:"total"`
+		Page     int                           `json:"page"`
+		PerPage  int                           `json:"per_page"`
+	}{rows, total, page, perPage}})
+}
+
+// GetCampaignSendLogStats returns aggregate send-log counts for the campaign.
+func (a *App) GetCampaignSendLogStats(c echo.Context) error {
+	id := getID(c)
+
+	if err := a.checkCampaignPerm(auth.PermTypeGet, id, c); err != nil {
+		return err
+	}
+
+	stats, err := a.core.QueryCampaignSendLogStats(id)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, okResp{stats})
+}

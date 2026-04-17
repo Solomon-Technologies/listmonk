@@ -304,6 +304,56 @@
           </b-field>
         </section>
       </b-tab-item><!-- archive -->
+
+      <!-- Solomon fork: Send Log tab — per-recipient records from campaign_send_log. -->
+      <b-tab-item label="Send Log" icon="format-list-checks" value="sendlog" :disabled="isNew">
+        <section class="wrap-small">
+          <div v-if="sendLogStats" class="columns">
+            <div class="column"><p class="has-text-grey is-size-7">TOTAL</p><p class="is-size-4">{{ sendLogStats.total_logged.toLocaleString() }}</p></div>
+            <div class="column"><p class="has-text-grey is-size-7">SENT</p><p class="is-size-4 has-text-success">{{ sendLogStats.total_sent.toLocaleString() }}</p></div>
+            <div class="column"><p class="has-text-grey is-size-7">FAILED</p><p class="is-size-4 has-text-danger">{{ sendLogStats.total_failed.toLocaleString() }}</p></div>
+            <div class="column"><p class="has-text-grey is-size-7">FIRST</p><p class="is-size-7">{{ sendLogStats.first_sent_at ? $utils.niceDate(sendLogStats.first_sent_at, true) : '—' }}</p></div>
+            <div class="column"><p class="has-text-grey is-size-7">LAST</p><p class="is-size-7">{{ sendLogStats.last_sent_at ? $utils.niceDate(sendLogStats.last_sent_at, true) : '—' }}</p></div>
+          </div>
+
+          <div class="columns">
+            <div class="column"><b-input v-model="sendLogEmailFilter" placeholder="Filter by email" icon="magnify" @input="onSendLogFilter" /></div>
+            <div class="column is-one-quarter">
+              <b-select v-model="sendLogStatusFilter" expanded @input="loadSendLog">
+                <option value="">All statuses</option>
+                <option value="sent">Sent</option>
+                <option value="failed">Failed</option>
+              </b-select>
+            </div>
+          </div>
+
+          <b-table :data="sendLogRows" :loading="sendLogLoading" :paginated="true" :per-page="sendLogPerPage"
+            backend-pagination :total="sendLogTotal" :current-page.sync="sendLogPage" @page-change="onSendLogPage"
+            :sticky-header="true" striped>
+            <b-table-column field="sent_at" label="Sent at" v-slot="props" width="160">
+              {{ $utils.niceDate(props.row.sent_at, true) }}
+            </b-table-column>
+            <b-table-column field="subscriber_email" label="Email" v-slot="props">
+              <router-link v-if="props.row.subscriber_uuid" :to="`/subscribers/${props.row.subscriber_id}`">{{ props.row.subscriber_email }}</router-link>
+              <span v-else>{{ props.row.subscriber_email }}</span>
+              <span v-if="props.row.subscriber_name" class="has-text-grey is-size-7">&nbsp;({{ props.row.subscriber_name }})</span>
+            </b-table-column>
+            <b-table-column field="messenger" label="Messenger" v-slot="props" width="120">
+              <span class="has-text-grey">{{ props.row.messenger || '—' }}</span>
+            </b-table-column>
+            <b-table-column field="status" label="Status" v-slot="props" width="90">
+              <b-tag v-if="props.row.status === 'sent'" type="is-success is-light">sent</b-tag>
+              <b-tag v-else type="is-danger is-light">failed</b-tag>
+            </b-table-column>
+            <b-table-column field="error_message" label="Error" v-slot="props">
+              <span v-if="props.row.error_message" class="has-text-danger is-size-7">{{ props.row.error_message }}</span>
+            </b-table-column>
+            <template #empty>
+              <div class="has-text-centered has-text-grey p-4">No send records yet. Send a campaign to populate the log.</div>
+            </template>
+          </b-table>
+        </section>
+      </b-tab-item><!-- sendlog -->
     </b-tabs>
 
     <b-modal scroll="keep" :aria-modal="true" :active.sync="isAttachModalOpen" :width="900">
@@ -358,6 +408,17 @@ export default Vue.extend({
       isAttachModalOpen: false,
       isPreviewingArchive: false,
       activeTab: 'campaign',
+
+      // Send Log tab — Solomon fork
+      sendLogRows: [],
+      sendLogTotal: 0,
+      sendLogPage: 1,
+      sendLogPerPage: 50,
+      sendLogEmailFilter: '',
+      sendLogStatusFilter: '',
+      sendLogLoading: false,
+      sendLogStats: null,
+      sendLogFilterTimer: null,
 
       data: {},
 
@@ -449,8 +510,60 @@ export default Vue.extend({
         });
       }
 
+      // Solomon fork: lazy-load send log when tab opens.
+      if (tab === 'sendlog' && this.data.id) {
+        this.loadSendLogStats();
+        this.loadSendLog();
+      }
+
       // this.$router.replace({ hash: `#${tab}` });
       window.history.replaceState({}, '', `#${tab}`);
+    },
+
+    // Send Log tab — Solomon fork
+    loadSendLog() {
+      if (!this.data.id) return;
+      this.sendLogLoading = true;
+      const params = new URLSearchParams({
+        per_page: this.sendLogPerPage,
+        page: this.sendLogPage,
+      });
+      if (this.sendLogEmailFilter) params.set('email', this.sendLogEmailFilter);
+      if (this.sendLogStatusFilter) params.set('status', this.sendLogStatusFilter);
+      this.$api.http.get(`/api/campaigns/${this.data.id}/send-log?${params.toString()}`)
+        .then((res) => {
+          const d = res.data && res.data.data ? res.data.data : res.data;
+          this.sendLogRows = d.results || [];
+          this.sendLogTotal = d.total || 0;
+        })
+        .catch((err) => {
+          this.$utils.toast(err.message || 'Failed to load send log', 'is-danger');
+        })
+        .finally(() => { this.sendLogLoading = false; });
+    },
+
+    loadSendLogStats() {
+      if (!this.data.id) return;
+      this.$api.http.get(`/api/campaigns/${this.data.id}/send-log/stats`)
+        .then((res) => {
+          const d = res.data && res.data.data ? res.data.data : res.data;
+          this.sendLogStats = d;
+        })
+        .catch(() => { /* non-fatal */ });
+    },
+
+    onSendLogPage(p) {
+      this.sendLogPage = p;
+      this.loadSendLog();
+    },
+
+    onSendLogFilter() {
+      // debounce typing
+      clearTimeout(this.sendLogFilterTimer);
+      this.sendLogFilterTimer = setTimeout(() => {
+        this.sendLogPage = 1;
+        this.loadSendLog();
+      }, 400);
     },
 
     onFillArchiveMeta() {
