@@ -275,6 +275,12 @@ func main() {
 		}
 	})
 
+	// Solomon fork: fire `campaign.send` webhook event on every successful
+	// messenger.Push. Lets downstream CRMs (Odoo) move stages in real-time.
+	mgr.SetSendDispatcher(func(event string, payload any) {
+		webhookMgr.Dispatch(event, payload)
+	})
+
 	// Start the campaign manager workers. The campaign batches (fetch from DB, push out
 	// messages) get processed at the specified interval.
 	go mgr.Run()

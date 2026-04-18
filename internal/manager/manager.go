@@ -73,6 +73,11 @@ type Manager struct {
 	// SetSendLogger from cmd/init.go — nil-safe (skipped if unset).
 	sendLogger func(campaignID, subscriberID int, email, messenger, status, errMsg string)
 
+	// Solomon fork: dispatches a `campaign.send` webhook event after each
+	// successful push. Wired to webhookMgr.Dispatch from cmd/main.go — lets
+	// external CRMs (Odoo) move stages/timestamps the moment a send happens.
+	sendDispatcher func(event string, payload any)
+
 	// Campaigns that are currently running.
 	pipes    map[int]*pipe
 	pipesMut sync.RWMutex
@@ -202,6 +207,14 @@ func (m *Manager) AddMessenger(msg Messenger) error {
 // Solomon fork — powers the Campaign > Send Log UI tab.
 func (m *Manager) SetSendLogger(fn func(campaignID, subscriberID int, email, messenger, status, errMsg string)) {
 	m.sendLogger = fn
+}
+
+// SetSendDispatcher wires the webhook dispatcher so a `campaign.send` event
+// fires after every successful per-recipient Push. Downstream CRMs (Odoo)
+// use this to move stages + write timestamps immediately on send — without
+// polling. Nil is a valid value. Solomon fork.
+func (m *Manager) SetSendDispatcher(fn func(event string, payload any)) {
+	m.sendDispatcher = fn
 }
 
 // PushMessage pushes an arbitrary non-campaign Message to be sent out by the workers.
@@ -606,6 +619,21 @@ func (m *Manager) worker() {
 					status,
 					errMsg,
 				)
+			}
+
+			// Solomon fork: fire campaign.send webhook on successful push so
+			// downstream CRMs (Odoo) can move stages + write timestamps in
+			// real-time. Non-blocking; drops on dispatcher queue-full.
+			if m.sendDispatcher != nil && err == nil {
+				go m.sendDispatcher("campaign.send", map[string]any{
+					"campaign_id":      msg.Campaign.ID,
+					"campaign_uuid":    msg.Campaign.UUID,
+					"campaign_name":    msg.Campaign.Name,
+					"subscriber_id":    msg.Subscriber.ID,
+					"subscriber_uuid":  msg.Subscriber.UUID,
+					"subscriber_email": msg.Subscriber.Email,
+					"sent_at":          time.Now().UTC().Format(time.RFC3339),
+				})
 			}
 
 			// Increment the send rate or the error counter if there was an error.
