@@ -456,6 +456,25 @@ WITH view AS (
 INSERT INTO campaign_views (campaign_id, subscriber_id)
     VALUES((SELECT campaign_id FROM view), (SELECT subscriber_id FROM view));
 
+-- name: refresh-campaigns-to-send
+-- Solomon fork: recompute campaigns.to_send against current subscriber_lists
+-- membership for any scheduled / running / paused campaign. Keeps the
+-- "X / Y sent" display accurate even when subs are added/removed from the
+-- target list AFTER the campaign was first scheduled.
+UPDATE campaigns c
+SET to_send = sub.cnt
+FROM (
+    SELECT cl.campaign_id AS id, COUNT(DISTINCT sl.subscriber_id) AS cnt
+    FROM campaign_lists cl
+    JOIN subscriber_lists sl ON sl.list_id = cl.list_id
+        AND sl.status IN ('confirmed', 'unconfirmed')
+    JOIN subscribers s ON s.id = sl.subscriber_id AND s.status != 'blocklisted'
+    JOIN campaigns c2 ON c2.id = cl.campaign_id
+    WHERE c2.status IN ('scheduled', 'running', 'paused', 'draft')
+    GROUP BY cl.campaign_id
+) AS sub
+WHERE c.id = sub.id AND c.to_send IS DISTINCT FROM sub.cnt;
+
 -- name: insert-campaign-send-log
 -- Solomon fork: per-recipient send record written by the manager right after
 -- the messenger Push returns. status='sent' on success, 'failed' on error.

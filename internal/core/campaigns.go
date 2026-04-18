@@ -526,3 +526,15 @@ func (c *Core) DeleteCampaignLinkClicks(before time.Time) error {
 
 	return nil
 }
+
+// RefreshCampaignsToSend recomputes campaigns.to_send against current list
+// membership for all non-finished campaigns (draft, scheduled, running,
+// paused). Solomon fork — called every 2 min by the to-send-refresher
+// goroutine so the UI "X/Y sent" display reflects ongoing list changes.
+func (c *Core) RefreshCampaignsToSend() error {
+	if _, err := c.q.RefreshCampaignsToSend.Exec(); err != nil {
+		c.log.Printf("error refreshing campaigns.to_send: %s", err)
+		return err
+	}
+	return nil
+}

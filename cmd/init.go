@@ -994,6 +994,20 @@ func initCron(co *core.Core, db *sqlx.DB) {
 		}
 	}
 
+	// Solomon fork: to_send refresher — recompute campaigns.to_send against
+	// current list membership every 2 min. Keeps the UI "X / Y sent" display
+	// accurate after subs are added/removed from the target list (e.g. via
+	// WF2 adding newly-enriched subs to list 12 while a campaign is scheduled).
+	if _, err := c.Add("@every 2m", func() {
+		if err := co.RefreshCampaignsToSend(); err != nil {
+			lo.Printf("to_send refresh error: %v", err)
+		}
+	}); err != nil {
+		lo.Printf("error initializing to_send refresh cron: %v", err)
+	} else {
+		lo.Printf("campaign to_send refresher enabled (every 2m)")
+	}
+
 	if len(c.Entries()) > 0 {
 		c.Start()
 	}
