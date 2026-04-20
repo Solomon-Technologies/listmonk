@@ -249,6 +249,15 @@
                 </div>
               </b-field>
             </div>
+            <!-- Solomon fork: evergreen toggle. When true the campaign stays
+                 in 'running' status after draining its initial recipients
+                 and re-sends to newly-added list subscribers on a schedule. -->
+            <div class="column is-4">
+              <b-field label="Evergreen (drip mode)" data-cy="btn-evergreen"
+                message="Keep this campaign running and auto-send to new subscribers as they're added to the list. Existing recipients are deduped via campaign_send_log — nobody gets the same campaign twice.">
+                <b-switch data-cy="btn-evergreen" v-model="form.isEvergreen" :disabled="!canEdit" />
+              </b-field>
+            </div>
             <div class="column is-8">
               <b-field grouped position="is-right">
                 <b-field v-if="!canEdit && canArchive">
@@ -722,6 +731,7 @@ export default Vue.extend({
         archive: this.form.archive,
         archive_template_id: this.form.archiveTemplateId,
         archive_meta: this.form.archiveMeta,
+        is_evergreen: this.form.isEvergreen,
         media: this.form.media.map((m) => m.id),
       };
 

@@ -25,7 +25,7 @@ WITH tpl AS (
 camp AS (
     INSERT INTO campaigns (uuid, type, name, subject, from_email, body, altbody,
         content_type, send_at, headers, attribs, tags, messenger, template_id, to_send,
-        max_subscriber_id, archive, archive_slug, archive_template_id, archive_meta, body_source)
+        max_subscriber_id, archive, archive_slug, archive_template_id, archive_meta, body_source, is_evergreen)
         SELECT $1, $2, $3, $4, $5,
             -- body
             COALESCE(NULLIF($6, ''), (SELECT body FROM tpl), ''),
@@ -40,7 +40,9 @@ camp AS (
             $18,
             $19,
             -- body_source
-            COALESCE($21, (SELECT body_source FROM tpl))
+            COALESCE($21, (SELECT body_source FROM tpl)),
+            -- is_evergreen
+            COALESCE($22::BOOLEAN, false)
         RETURNING id
 ),
 med AS (
@@ -278,11 +280,37 @@ SELECT COUNT(%s) AS "count", url
 -- name: get-running-campaign
 -- Returns the metadata for a running campaign that is required by next-campaign-subscribers to retrieve
 -- a batch of campaign subscribers for processing.
-SELECT campaigns.id AS campaign_id, campaigns.type as campaign_type, last_subscriber_id, max_subscriber_id, lists.id AS list_id
+SELECT campaigns.id AS campaign_id, campaigns.type as campaign_type, last_subscriber_id, max_subscriber_id, is_evergreen, lists.id AS list_id
     FROM campaigns
     JOIN campaign_lists ON (campaign_lists.campaign_id = campaigns.id)
     JOIN lists ON (lists.id = campaign_lists.list_id)
     WHERE campaigns.id = $1 AND campaigns.status='running';
+
+-- name: reset-evergreen-progress
+-- Rewinds last_subscriber_id to 0 for the given evergreen campaigns so the
+-- next scanCampaigns pick them up and reprocess the list. Combined with the
+-- NOT EXISTS clause in next-campaign-subscribers (when $7=true), this is
+-- safe — already-sent subscribers are filtered out on re-scan.
+UPDATE campaigns
+  SET last_subscriber_id = 0, max_subscriber_id = COALESCE((SELECT MAX(id) FROM subscribers), 0), updated_at = NOW()
+WHERE id = ANY($1::INT[]) AND is_evergreen = true AND status = 'running';
+
+-- name: get-evergreen-campaigns-with-new-subs
+-- Returns evergreen campaign IDs whose target lists have subscribers that
+-- have NOT yet been sent the campaign (per campaign_send_log). Used by the
+-- manager's scanEvergreenCampaigns goroutine to decide which evergreen
+-- campaigns to re-kick on each tick.
+SELECT DISTINCT c.id
+FROM campaigns c
+JOIN campaign_lists cl ON cl.campaign_id = c.id
+JOIN subscriber_lists sl ON sl.list_id = cl.list_id AND sl.status = 'confirmed'
+WHERE c.is_evergreen = true
+  AND c.status = 'running'
+  AND NOT EXISTS (
+    SELECT 1 FROM campaign_send_log csl
+    WHERE csl.campaign_id = c.id
+      AND csl.subscriber_id = sl.subscriber_id
+  );
 
 -- name: next-campaign-subscribers
 -- Returns a batch of subscribers in a given campaign starting from the last checkpoint
@@ -328,6 +356,17 @@ subs AS (
                         -- It is a single optin list. Pick all non-unsubscribed subscribers.
                         (campLists.optin != 'double' AND sl.status != 'unsubscribed')
                     )
+                )
+            )
+            -- Evergreen dedup: when $7=true, exclude subscribers the campaign
+            -- has already been sent to (per campaign_send_log). This lets
+            -- evergreen campaigns rewind last_subscriber_id to 0 on a rescan
+            -- and only pick up newly-added list members.
+            AND (
+                $7 = false
+                OR NOT EXISTS (
+                    SELECT 1 FROM campaign_send_log csl
+                    WHERE csl.campaign_id = $1 AND csl.subscriber_id = s.id
                 )
             )
         ORDER BY s.id LIMIT $6
@@ -381,6 +420,7 @@ WITH camp AS (
         archive_template_id=(CASE WHEN $7::content_type = 'visual' THEN NULL ELSE $17::INT END),
         archive_meta=$18,
         body_source=$20,
+        is_evergreen=COALESCE($21::BOOLEAN, is_evergreen),
         updated_at=NOW()
     WHERE id = $1 RETURNING id
 ),

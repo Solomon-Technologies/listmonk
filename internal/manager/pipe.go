@@ -222,8 +222,15 @@ func (p *pipe) cleanup() {
 		return
 	}
 
-	// If a running campaign has exhausted subscribers, it's finished.
-	if c.Status == models.CampaignStatusRunning || c.Status == models.CampaignStatusScheduled {
+	// Evergreen campaigns never transition to finished — they wait in the
+	// running state for future subscribers to join the list. The evergreen
+	// scanner goroutine (see manager.Run → scanEvergreenCampaigns) resets
+	// last_subscriber_id on a periodic tick so freshly-added subscribers
+	// get picked up on the next normal scan cycle.
+	if c.IsEvergreen && c.Status == models.CampaignStatusRunning {
+		p.m.log.Printf("evergreen campaign (%s) drained initial send; staying in running", p.camp.Name)
+	} else if c.Status == models.CampaignStatusRunning || c.Status == models.CampaignStatusScheduled {
+		// If a running campaign has exhausted subscribers, it's finished.
 		c.Status = models.CampaignStatusFinished
 		if err := p.m.store.UpdateCampaignStatus(p.camp.ID, models.CampaignStatusFinished); err != nil {
 			p.m.log.Printf("error finishing campaign (%s): %v", p.camp.Name, err)

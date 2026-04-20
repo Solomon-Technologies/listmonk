@@ -22,6 +22,7 @@ type runningCamp struct {
 	CampaignType     string `db:"campaign_type"`
 	LastSubscriberID int    `db:"last_subscriber_id"`
 	MaxSubscriberID  int    `db:"max_subscriber_id"`
+	IsEvergreen      bool   `db:"is_evergreen"`
 	ListID           int    `db:"list_id"`
 }
 
@@ -62,8 +63,28 @@ func (s *store) NextSubscribers(campID, limit int) ([]models.Subscriber, error) 
 	}
 
 	var out []models.Subscriber
-	err := s.queries.NextCampaignSubscribers.Select(&out, camps[0].CampaignID, camps[0].CampaignType, camps[0].LastSubscriberID, camps[0].MaxSubscriberID, pq.Array(listIDs), limit)
+	err := s.queries.NextCampaignSubscribers.Select(&out, camps[0].CampaignID, camps[0].CampaignType, camps[0].LastSubscriberID, camps[0].MaxSubscriberID, pq.Array(listIDs), limit, camps[0].IsEvergreen)
 	return out, err
+}
+
+// EvergreenCampaignsWithNewSubs returns IDs of is_evergreen=true running
+// campaigns whose target lists have subscribers not yet in campaign_send_log.
+func (s *store) EvergreenCampaignsWithNewSubs() ([]int64, error) {
+	var ids []int64
+	err := s.queries.GetEvergreenCampaignsWithNewSubs.Select(&ids)
+	return ids, err
+}
+
+// ResetEvergreenProgress rewinds last_subscriber_id to 0 for the given
+// campaign IDs so the next scanCampaigns pass picks them up and runs
+// next-campaign-subscribers again — filtering out already-sent rows via
+// the NOT EXISTS dedup in the query (enabled by is_evergreen=true).
+func (s *store) ResetEvergreenProgress(ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err := s.queries.ResetEvergreenProgress.Exec(pq.Int64Array(ids))
+	return err
 }
 
 // GetCampaign fetches a campaign from the database.

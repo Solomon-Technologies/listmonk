@@ -42,6 +42,15 @@ type Store interface {
 	CreateLink(url string) (string, error)
 	BlocklistSubscriber(id int64) error
 	DeleteSubscriber(id int64) error
+
+	// Solomon fork: evergreen campaign re-queue support.
+	// EvergreenCampaignsWithNewSubs returns IDs of running is_evergreen=true
+	// campaigns whose lists have subscribers not yet in campaign_send_log.
+	// ResetEvergreenProgress rewinds last_subscriber_id to 0 so the normal
+	// scanCampaigns loop picks them up and re-runs next-campaign-subscribers
+	// (the NOT EXISTS dedup in that query filters already-sent rows).
+	EvergreenCampaignsWithNewSubs() ([]int64, error)
+	ResetEvergreenProgress(ids []int64) error
 }
 
 // Messenger is an interface for a generic messaging backend,
@@ -293,6 +302,12 @@ func (m *Manager) Run() {
 		// Periodically scan campaigns and push running campaigns to nextPipes
 		// to fetch subscribers from the campaign.
 		go m.scanCampaigns(m.cfg.ScanInterval)
+
+		// Solomon fork: periodically re-kick evergreen campaigns whose
+		// target lists have freshly-added subscribers. Interval is 5×
+		// the normal scan interval so we don't thrash on sliding-window
+		// rate limits — evergreen campaigns are drip-y, not real-time.
+		go m.scanEvergreenCampaigns(m.cfg.ScanInterval * 5)
 	}
 
 	// Spawn N message workers.
@@ -495,6 +510,32 @@ func (m *Manager) Close() {
 // scanCampaigns is a blocking function that periodically scans the data source
 // for campaigns to process and dispatches them to the manager. It feeds campaigns
 // into nextPipes.
+// scanEvergreenCampaigns (Solomon fork) periodically checks evergreen
+// campaigns for newly-added list subscribers and rewinds their
+// last_subscriber_id so scanCampaigns picks them up on its next tick.
+// The NOT EXISTS clause in next-campaign-subscribers (gated on
+// is_evergreen=true) filters out already-sent rows so we never duplicate.
+func (m *Manager) scanEvergreenCampaigns(tick time.Duration) {
+	t := time.NewTicker(tick)
+	defer t.Stop()
+
+	for range t.C {
+		ids, err := m.store.EvergreenCampaignsWithNewSubs()
+		if err != nil {
+			m.log.Printf("error scanning evergreen campaigns: %v", err)
+			continue
+		}
+		if len(ids) == 0 {
+			continue
+		}
+		if err := m.store.ResetEvergreenProgress(ids); err != nil {
+			m.log.Printf("error resetting evergreen progress: %v", err)
+			continue
+		}
+		m.log.Printf("re-kicked %d evergreen campaigns with new subscribers", len(ids))
+	}
+}
+
 func (m *Manager) scanCampaigns(tick time.Duration) {
 	t := time.NewTicker(tick)
 	defer t.Stop()
