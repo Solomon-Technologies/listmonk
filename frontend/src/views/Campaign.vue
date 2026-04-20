@@ -254,7 +254,7 @@
                  and re-sends to newly-added list subscribers on a schedule. -->
             <div class="column is-4">
               <b-field label="Evergreen (drip mode)" data-cy="btn-evergreen"
-                message="Keep this campaign running and auto-send to new subscribers as they're added to the list. Existing recipients are deduped via campaign_send_log — nobody gets the same campaign twice.">
+                message="Stays running and re-sends to new list subscribers. Existing recipients are deduped via campaign_send_log.">
                 <b-switch data-cy="btn-evergreen" v-model="form.isEvergreen" :disabled="!canEdit" />
               </b-field>
             </div>

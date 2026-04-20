@@ -35,11 +35,15 @@ func V7_15_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf, lo *log.Logge
 		return err
 	}
 
-	// Send-log dedup index — the evergreen subscriber-fetch query joins
-	// against this. Partial so we only index rows where subscriber_id is
-	// still set (v7.14.0 switched FK to ON DELETE SET NULL).
+	// Send-log lookup index for the evergreen NOT EXISTS dedup in
+	// next-campaign-subscribers. Non-unique on purpose — existing sends can
+	// legitimately have multiple log rows per (campaign, subscriber) when
+	// an admin paused + restarted a campaign, or when the subscriber_id FK
+	// was re-associated after a v7.14.0 ON DELETE SET NULL clear.
+	// Partial so the index stays small: only rows with an active
+	// subscriber_id matter for dedup (NULL rows are historical preservation).
 	if _, err := db.Exec(`
-		CREATE UNIQUE INDEX IF NOT EXISTS idx_csl_campaign_subscriber_unique
+		CREATE INDEX IF NOT EXISTS idx_csl_campaign_subscriber_lookup
 		ON campaign_send_log (campaign_id, subscriber_id)
 		WHERE subscriber_id IS NOT NULL;
 	`); err != nil {
