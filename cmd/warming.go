@@ -282,6 +282,7 @@ func (a *App) CreateWarmingCampaign(c echo.Context) error {
 		BusinessHoursOnly bool            `json:"business_hours_only"`
 		SenderID          *int            `json:"sender_id"`
 		Messenger         string          `json:"messenger"`
+		RecipientIDs      []int64         `json:"recipient_ids"`
 	}
 	if err := c.Bind(&o); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
@@ -337,6 +338,7 @@ func (a *App) CreateWarmingCampaign(c echo.Context) error {
 		WarmupStartDate:   startDate,
 		SenderID:          senderID,
 		Messenger:         o.Messenger,
+		RecipientIDs:      pq.Int64Array(o.RecipientIDs),
 	})
 	if err != nil {
 		return err
@@ -363,6 +365,7 @@ func (a *App) UpdateWarmingCampaign(c echo.Context) error {
 		BusinessHoursOnly bool            `json:"business_hours_only"`
 		SenderID          *int            `json:"sender_id"`
 		Messenger         string          `json:"messenger"`
+		RecipientIDs      []int64         `json:"recipient_ids"`
 	}
 	if err := c.Bind(&o); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
@@ -397,6 +400,7 @@ func (a *App) UpdateWarmingCampaign(c echo.Context) error {
 		WarmupStartDate:   startDate,
 		SenderID:          senderID,
 		Messenger:         o.Messenger,
+		RecipientIDs:      pq.Int64Array(o.RecipientIDs),
 	}); err != nil {
 		return err
 	}

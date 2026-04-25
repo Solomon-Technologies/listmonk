@@ -120,6 +120,27 @@ func (w *WarmingProcessor) checkAndProcess() {
 
 // processCampaign handles a single warming campaign's scheduled sends.
 func (w *WarmingProcessor) processCampaign(camp models.WarmingCampaign, now time.Time, addresses []models.WarmingAddress, templates []models.WarmingTemplate) {
+	// Per-campaign recipient subset: if recipient_ids is non-empty, restrict
+	// this campaign's sends to those address IDs only. Empty = send to all
+	// active addresses (default).
+	if len(camp.RecipientIDs) > 0 {
+		allowed := make(map[int]struct{}, len(camp.RecipientIDs))
+		for _, id := range camp.RecipientIDs {
+			allowed[int(id)] = struct{}{}
+		}
+		filtered := addresses[:0:0]
+		for _, a := range addresses {
+			if _, ok := allowed[a.ID]; ok {
+				filtered = append(filtered, a)
+			}
+		}
+		if len(filtered) == 0 {
+			w.log.Printf("warming campaign %q: recipient_ids set but none match active addresses, skipping", camp.Name)
+			return
+		}
+		addresses = filtered
+	}
+
 	// Business hours check: Mon-Fri, 9 AM - 6 PM ET (13:00-22:00 UTC).
 	if camp.BusinessHoursOnly {
 		if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {

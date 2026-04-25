@@ -229,11 +229,14 @@ func (c *Core) GetWarmingCampaigns() ([]models.WarmingCampaign, error) {
 // CreateWarmingCampaign creates a new warming campaign.
 func (c *Core) CreateWarmingCampaign(o models.WarmingCampaign) (int, error) {
 	var id int
+	if o.RecipientIDs == nil {
+		o.RecipientIDs = pq.Int64Array{}
+	}
 	if err := c.q.CreateWarmingCampaign.Get(&id,
 		o.Name, o.Brand, o.SenderDomains, o.Status,
 		o.SendsPerRun, o.RunsPerDay, o.ScheduleTimes,
 		o.RandomDelayMin, o.RandomDelayMax,
-		o.WarmupStartDate, o.DailyLimits, o.HourlyCap, o.BusinessHoursOnly, o.SenderID, o.Messenger); err != nil {
+		o.WarmupStartDate, o.DailyLimits, o.HourlyCap, o.BusinessHoursOnly, o.SenderID, o.Messenger, o.RecipientIDs); err != nil {
 		c.log.Printf("error creating warming campaign: %v", err)
 		return 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "warming campaign", "error", pqErrMsg(err)))
@@ -243,11 +246,14 @@ func (c *Core) CreateWarmingCampaign(o models.WarmingCampaign) (int, error) {
 
 // UpdateWarmingCampaign updates a warming campaign.
 func (c *Core) UpdateWarmingCampaign(id int, o models.WarmingCampaign) error {
+	if o.RecipientIDs == nil {
+		o.RecipientIDs = pq.Int64Array{}
+	}
 	if _, err := c.q.UpdateWarmingCampaign.Exec(id,
 		o.Name, o.Brand, o.SenderDomains, o.Status,
 		o.SendsPerRun, o.RunsPerDay, o.ScheduleTimes,
 		o.RandomDelayMin, o.RandomDelayMax,
-		o.WarmupStartDate, o.DailyLimits, o.HourlyCap, o.BusinessHoursOnly, o.SenderID, o.Messenger); err != nil {
+		o.WarmupStartDate, o.DailyLimits, o.HourlyCap, o.BusinessHoursOnly, o.SenderID, o.Messenger, o.RecipientIDs); err != nil {
 		c.log.Printf("error updating warming campaign: %v", err)
 		return echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorUpdating", "name", "warming campaign", "error", pqErrMsg(err)))

@@ -317,6 +317,19 @@
               @typing="domainQuery = $event"
             />
           </b-field>
+          <b-field label="Recipients (optional)"
+            message="Pick specific warming addresses to send to. Leave empty to send to ALL active addresses.">
+            <b-taginput
+              v-model="form.recipients"
+              :data="filteredRecipients"
+              field="email"
+              autocomplete
+              :allow-new="false"
+              :open-on-focus="true"
+              placeholder="All active addresses (default) — start typing to pick specific..."
+              @typing="recipientQuery = $event"
+            />
+          </b-field>
           <div class="columns">
             <div class="column">
               <b-field label="Sends per run" message="Emails per batch">
@@ -405,6 +418,7 @@ export default Vue.extend({
     return {
       campaigns: [],
       warmingSenders: [],
+      warmingAddresses: [],
       loading: false,
       saving: false,
 
@@ -426,6 +440,7 @@ export default Vue.extend({
       config: null,
 
       domainQuery: '',
+      recipientQuery: '',
     };
   },
 
@@ -441,6 +456,16 @@ export default Vue.extend({
       return this.allDomains.filter(
         (d) => !this.form.senderDomains.includes(d)
           && d.toLowerCase().includes((this.domainQuery || '').toLowerCase()),
+      );
+    },
+
+    filteredRecipients() {
+      const picked = new Set((this.form.recipients || []).map((r) => r.id));
+      const q = (this.recipientQuery || '').toLowerCase();
+      return this.warmingAddresses.filter(
+        (a) => a.is_active
+          && !picked.has(a.id)
+          && (a.email.toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q)),
       );
     },
   },
@@ -463,6 +488,7 @@ export default Vue.extend({
         dailyLimitsStr: '[]',
         warmupStartDate: '',
         messenger: '',
+        recipients: [],
       };
     },
 
@@ -483,6 +509,12 @@ export default Vue.extend({
     getSenders() {
       this.$api.getWarmingSenders().then((data) => {
         this.warmingSenders = data || [];
+      });
+    },
+
+    getAddresses() {
+      this.$api.getWarmingAddresses().then((data) => {
+        this.warmingAddresses = data || [];
       });
     },
 
@@ -562,6 +594,9 @@ export default Vue.extend({
     },
 
     editCampaign(row) {
+      const recipientIds = row.recipient_ids || [];
+      const recipients = this.warmingAddresses
+        .filter((a) => recipientIds.includes(a.id));
       this.form = {
         name: row.name,
         brand: row.brand,
@@ -579,6 +614,7 @@ export default Vue.extend({
         warmupStartDate: row.warmup_start_date
           ? row.warmup_start_date.substring(0, 10) : '',
         messenger: row.messenger || '',
+        recipients,
       };
       this.isEditing = true;
       this.editingId = row.id;
@@ -617,6 +653,7 @@ export default Vue.extend({
         daily_limits: dailyLimits,
         warmup_start_date: this.form.warmupStartDate || null,
         messenger: this.form.messenger || '',
+        recipient_ids: (this.form.recipients || []).map((r) => r.id),
       };
 
       const fn = this.isEditing
@@ -649,6 +686,7 @@ export default Vue.extend({
         warmup_start_date: row.warmup_start_date
           ? row.warmup_start_date.substring(0, 10) : null,
         messenger: row.messenger || '',
+        recipient_ids: row.recipient_ids || [],
       };
       this.$api.updateWarmingCampaign(row.id, payload).then(() => {
         this.getCampaigns();
@@ -698,6 +736,7 @@ export default Vue.extend({
   mounted() {
     this.getCampaigns();
     this.getSenders();
+    this.getAddresses();
     this.getConfig();
   },
 });

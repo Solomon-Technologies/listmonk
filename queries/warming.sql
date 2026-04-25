@@ -98,8 +98,8 @@ SELECT COUNT(*) FROM warming_send_log WHERE ($1 = 0 OR campaign_id = $1);
 SELECT * FROM warming_campaigns ORDER BY created_at DESC;
 
 -- name: create-warming-campaign
-INSERT INTO warming_campaigns (name, brand, sender_domains, status, sends_per_run, runs_per_day, schedule_times, random_delay_min_s, random_delay_max_s, warmup_start_date, daily_limits, hourly_cap, business_hours_only, sender_id, messenger)
-    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id;
+INSERT INTO warming_campaigns (name, brand, sender_domains, status, sends_per_run, runs_per_day, schedule_times, random_delay_min_s, random_delay_max_s, warmup_start_date, daily_limits, hourly_cap, business_hours_only, sender_id, messenger, recipient_ids)
+    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id;
 
 -- name: update-warming-campaign
 UPDATE warming_campaigns SET
@@ -107,7 +107,8 @@ UPDATE warming_campaigns SET
     sends_per_run = $6, runs_per_day = $7, schedule_times = $8,
     random_delay_min_s = $9, random_delay_max_s = $10,
     warmup_start_date = $11, daily_limits = $12, hourly_cap = $13,
-    business_hours_only = $14, sender_id = $15, messenger = $16, updated_at = NOW()
+    business_hours_only = $14, sender_id = $15, messenger = $16,
+    recipient_ids = $17, updated_at = NOW()
 WHERE id = $1;
 
 -- name: delete-warming-campaign

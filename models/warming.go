@@ -71,6 +71,7 @@ type WarmingCampaign struct {
 	BusinessHoursOnly bool             `db:"business_hours_only" json:"business_hours_only"`
 	SenderID          null.Int         `db:"sender_id" json:"sender_id"`
 	Messenger         string           `db:"messenger" json:"messenger"`
+	RecipientIDs      pq.Int64Array    `db:"recipient_ids" json:"recipient_ids"`
 	CreatedAt         time.Time        `db:"created_at" json:"created_at"`
 	UpdatedAt         time.Time        `db:"updated_at" json:"updated_at"`
 }
