@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/mail"
 	"strings"
 	"sync"
 	"time"
@@ -275,7 +276,12 @@ func (w *WarmingProcessor) processCampaign(camp models.WarmingCampaign, now time
 </div>`,
 			body, sender.Name, sender.BrandURL, sender.BrandColor, sender.Brand)
 
-		fromEmail := fmt.Sprintf("%s <%s>", sender.Name, sender.Email)
+		fromEmail := (&mail.Address{Name: sender.Name, Address: sender.Email}).String()
+
+		messengerName := camp.Messenger
+		if messengerName == "" {
+			messengerName = "email"
+		}
 
 		msg := models.Message{
 			From:        fromEmail,
@@ -283,15 +289,13 @@ func (w *WarmingProcessor) processCampaign(camp models.WarmingCampaign, now time
 			Subject:     subject,
 			ContentType: "html",
 			Body:        []byte(htmlBody),
-			Messenger: func() string {
-			if camp.Messenger != "" {
-				return camp.Messenger
-			}
-			return "email"
-		}(),
+			Messenger:   messengerName,
 		}
 
-		if err := w.manager.PushMessage(msg); err != nil {
+		// Synchronous send so warming_send_log reflects real SMTP outcome
+		// (queueing via PushMessage hid messenger errors and reported every
+		// row as "sent" regardless of actual delivery).
+		if err := w.manager.SendMessageSync(msg); err != nil {
 			w.log.Printf("warming send error [%s] (%s -> %s): %v", camp.Name, sender.Email, addr.Email, err)
 			w.store.RecordWarmingSendCampaign(camp.ID, sender.Email, addr.Email, tpl.ID, subject, "failed", err.Error())
 		} else {

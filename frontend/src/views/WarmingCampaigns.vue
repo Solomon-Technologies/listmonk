@@ -213,6 +213,27 @@
             </div>
           </div>
 
+          <!-- Recipients picker state -->
+          <div class="mt-3">
+            <p class="is-size-7 has-text-grey mb-2">
+              Recipients
+              <span v-if="(viewingCampaign.recipient_ids || []).length > 0">
+                ({{ viewingCampaign.recipient_ids.length }} of
+                {{ activeAddressCount }} picked)
+              </span>
+              <span v-else>
+                (all {{ activeAddressCount }} active — default)
+              </span>
+            </p>
+            <div v-if="(viewingCampaign.recipient_ids || []).length > 0"
+              class="is-flex" style="gap: 0.4rem; flex-wrap: wrap;">
+              <b-tag v-for="email in pickedRecipientEmails(viewingCampaign)"
+                :key="email" type="is-light" size="is-small">
+                {{ email }}
+              </b-tag>
+            </div>
+          </div>
+
           <!-- Ramp schedule preview -->
           <div v-if="viewRampLimits.length > 0" class="mt-3">
             <p class="is-size-7 has-text-grey mb-2">Progressive Ramp</p>
@@ -468,6 +489,10 @@ export default Vue.extend({
           && (a.email.toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q)),
       );
     },
+
+    activeAddressCount() {
+      return this.warmingAddresses.filter((a) => a.is_active).length;
+    },
   },
 
   methods: {
@@ -496,6 +521,13 @@ export default Vue.extend({
       if (!senderIdVal) return null;
       const s = this.warmingSenders.find((x) => x.id === senderIdVal);
       return s ? s.email : null;
+    },
+
+    pickedRecipientEmails(row) {
+      const ids = new Set(row.recipient_ids || []);
+      return this.warmingAddresses
+        .filter((a) => ids.has(a.id))
+        .map((a) => a.email);
     },
 
     getCampaigns() {

@@ -226,6 +226,19 @@ func (m *Manager) SetSendDispatcher(fn func(event string, payload any)) {
 	m.sendDispatcher = fn
 }
 
+// SendMessageSync sends an arbitrary non-campaign Message synchronously
+// through its named messenger and returns the actual delivery error (if any).
+// Use this when callers need the real send status (e.g. warming send-log).
+// Bypasses the worker queue and any rate-limiting that the queue enforces;
+// only suitable for low-volume sends.
+func (m *Manager) SendMessageSync(msg models.Message) error {
+	mr, ok := m.messengers[msg.Messenger]
+	if !ok {
+		return fmt.Errorf("messenger %q not registered", msg.Messenger)
+	}
+	return mr.Push(msg)
+}
+
 // PushMessage pushes an arbitrary non-campaign Message to be sent out by the workers.
 // It times out if the queue is busy.
 func (m *Manager) PushMessage(msg models.Message) error {
