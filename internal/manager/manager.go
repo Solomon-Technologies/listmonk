@@ -104,11 +104,9 @@ type Manager struct {
 	campMsgQ  chan CampaignMessage
 	msgQ      chan models.Message
 
-	// Sliding window keeps track of the total number of messages sent in a period
-	// and on reaching the specified limit, waits until the window is over before
-	// sending further messages.
-	slidingCount int
-	slidingStart time.Time
+	// Solomon fork: sliding-window state was moved off the manager onto each
+	// pipe so the rate is enforced per-campaign instead of globally across
+	// the whole instance. See pipe.go for the per-campaign counter.
 
 	tplFuncs template.FuncMap
 }
@@ -190,9 +188,8 @@ func New(cfg Config, store Store, i *i18n.I18n, l *log.Logger) *Manager {
 		tpls:         make(map[int]*models.Template),
 		links:        make(map[string]string),
 		nextPipes:    make(chan *pipe, 1000),
-		campMsgQ:     make(chan CampaignMessage, cfg.Concurrency*cfg.MessageRate*2),
-		msgQ:         make(chan models.Message, cfg.Concurrency*cfg.MessageRate*2),
-		slidingStart: time.Now(),
+		campMsgQ: make(chan CampaignMessage, cfg.Concurrency*cfg.MessageRate*2),
+		msgQ:     make(chan models.Message, cfg.Concurrency*cfg.MessageRate*2),
 	}
 	m.tplFuncs = m.makeGnericFuncMap()
 

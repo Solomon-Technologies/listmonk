@@ -20,6 +20,14 @@ type pipe struct {
 	stopped    atomic.Bool
 	withErrors atomic.Bool
 
+	// Per-campaign sliding-window state. Solomon fork: the original Listmonk
+	// stored slidingCount/slidingStart on the Manager singleton, so every
+	// running campaign shared one global N-per-window budget. That meant a
+	// noisy campaign could starve every other campaign on the box. Each pipe
+	// now tracks its own window so per-campaign caps are real.
+	slidingCount int
+	slidingStart time.Time
+
 	m *Manager
 }
 
@@ -43,10 +51,11 @@ func (m *Manager) newPipe(c *models.Campaign) (*pipe, error) {
 
 	// Add the campaign to the active map.
 	p := &pipe{
-		camp: c,
-		rate: ratecounter.NewRateCounter(time.Minute),
-		wg:   &sync.WaitGroup{},
-		m:    m,
+		camp:         c,
+		rate:         ratecounter.NewRateCounter(time.Minute),
+		wg:           &sync.WaitGroup{},
+		slidingStart: time.Now(),
+		m:            m,
 	}
 
 	// Increment the waitgroup so that Wait() blocks immediately. This is necessary
@@ -103,28 +112,31 @@ func (p *pipe) NextSubscribers() (bool, error) {
 		// the queue is drained.
 		p.m.campMsgQ <- msg
 
-		// Check if the sliding window is active.
+		// Check if the sliding window is active. Counter is on the pipe so
+		// every campaign gets its own independent N-per-window budget; one
+		// hot campaign no longer eats every other campaign's quota.
 		if hasSliding {
-			diff := time.Since(p.m.slidingStart)
+			diff := time.Since(p.slidingStart)
 
 			// Window has expired. Reset the clock.
 			if diff >= p.m.cfg.SlidingWindowDuration {
-				p.m.slidingStart = time.Now()
-				p.m.slidingCount = 0
+				p.slidingStart = time.Now()
+				p.slidingCount = 0
 			}
 
 			// Have the messages exceeded the limit?
-			p.m.slidingCount++
-			if p.m.slidingCount >= p.m.cfg.SlidingWindowRate {
+			p.slidingCount++
+			if p.slidingCount >= p.m.cfg.SlidingWindowRate {
 				wait := p.m.cfg.SlidingWindowDuration - diff
 
-				p.m.log.Printf("messages exceeded (%d) for the window (%v since %s). Sleeping for %s.",
-					p.m.slidingCount,
+				p.m.log.Printf("campaign %q messages exceeded (%d) for the window (%v since %s). Sleeping for %s.",
+					p.camp.Name,
+					p.slidingCount,
 					p.m.cfg.SlidingWindowDuration,
-					p.m.slidingStart.Format(time.RFC822Z),
+					p.slidingStart.Format(time.RFC822Z),
 					wait.Round(time.Second)*1)
 
-				p.m.slidingCount = 0
+				p.slidingCount = 0
 				time.Sleep(wait)
 			}
 		}
