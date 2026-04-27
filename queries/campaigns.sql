@@ -300,10 +300,16 @@ WHERE id = ANY($1::INT[]) AND is_evergreen = true AND status = 'running';
 -- have NOT yet been sent the campaign (per campaign_send_log). Used by the
 -- manager's scanEvergreenCampaigns goroutine to decide which evergreen
 -- campaigns to re-kick on each tick.
+--
+-- Includes both 'confirmed' and 'unconfirmed' subscribers because cold-outreach
+-- lists are single-optin (subs land directly as 'unconfirmed'). Restricting to
+-- 'confirmed' silently blocked auto-rewind for every cold campaign — they'd
+-- drain once and never pick up new leads dripped in afterward.
 SELECT DISTINCT c.id
 FROM campaigns c
 JOIN campaign_lists cl ON cl.campaign_id = c.id
-JOIN subscriber_lists sl ON sl.list_id = cl.list_id AND sl.status = 'confirmed'
+JOIN subscriber_lists sl ON sl.list_id = cl.list_id
+  AND sl.status IN ('confirmed', 'unconfirmed')
 WHERE c.is_evergreen = true
   AND c.status = 'running'
   AND NOT EXISTS (
