@@ -358,6 +358,18 @@ export const updateCampaignArchive = async (id, data) => http.put(
   { loading: models.campaigns },
 );
 
+export const updateCampaignEvergreen = async (id, isEvergreen) => http.put(
+  `/api/campaigns/${id}/evergreen`,
+  { is_evergreen: isEvergreen },
+  { loading: models.campaigns },
+);
+
+export const rewindCampaign = async (id) => http.post(
+  `/api/campaigns/${id}/rewind`,
+  null,
+  { loading: models.campaigns },
+);
+
 export const deleteCampaign = async (id) => http.delete(
   `/api/campaigns/${id}`,
   { loading: models.campaigns },

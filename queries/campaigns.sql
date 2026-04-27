@@ -295,6 +295,16 @@ UPDATE campaigns
   SET last_subscriber_id = 0, max_subscriber_id = COALESCE((SELECT MAX(id) FROM subscribers), 0), updated_at = NOW()
 WHERE id = ANY($1::INT[]) AND is_evergreen = true AND status = 'running';
 
+-- name: set-campaign-evergreen
+-- Solomon fork: toggle is_evergreen on a campaign regardless of status. Used
+-- by the standalone Evergreen toggle on Campaign.vue so admins can flip a
+-- running campaign into evergreen mode (or back) without going through the
+-- full UpdateCampaign path (which restricts edits to draft/scheduled/paused).
+UPDATE campaigns
+  SET is_evergreen = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, is_evergreen;
+
 -- name: get-evergreen-campaigns-with-new-subs
 -- Returns evergreen campaign IDs whose target lists have subscribers that
 -- have NOT yet been sent the campaign (per campaign_send_log). Used by the

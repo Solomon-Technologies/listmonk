@@ -270,7 +270,13 @@ func (c *Core) UpdateCampaignStatus(id int, status string) (models.Campaign, err
 		}
 
 	case models.CampaignStatusRunning:
-		if cm.Status != models.CampaignStatusPaused && cm.Status != models.CampaignStatusDraft {
+		// Solomon fork: also allow resurrecting cancelled or finished campaigns
+		// directly into running. Combined with is_evergreen, this is how an
+		// admin re-opens an old campaign and lets it drain newly-added subs.
+		if cm.Status != models.CampaignStatusPaused &&
+			cm.Status != models.CampaignStatusDraft &&
+			cm.Status != models.CampaignStatusCancelled &&
+			cm.Status != models.CampaignStatusFinished {
 			errMsg = c.i18n.T("campaigns.onlyPausedDraft")
 		}
 	case models.CampaignStatusPaused:
@@ -302,6 +308,45 @@ func (c *Core) UpdateCampaignStatus(id int, status string) (models.Campaign, err
 
 	cm.Status = status
 	return cm, nil
+}
+
+// UpdateCampaignEvergreen toggles is_evergreen on a campaign regardless of its
+// current status. Solomon fork. Used by the standalone Evergreen toggle in the
+// UI so admins can flip a running campaign into evergreen mode without going
+// through the draft-only UpdateCampaign path.
+func (c *Core) UpdateCampaignEvergreen(id int, isEvergreen bool) (models.Campaign, error) {
+	row := c.q.SetCampaignEvergreen.QueryRow(id, isEvergreen)
+	var (
+		gotID    int
+		gotEverg bool
+	)
+	if err := row.Scan(&gotID, &gotEverg); err != nil {
+		c.log.Printf("error setting evergreen on campaign %d: %v", id, err)
+		return models.Campaign{}, echo.NewHTTPError(http.StatusInternalServerError,
+			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.campaign}", "error", pqErrMsg(err)))
+	}
+	return c.GetCampaign(id, "", "")
+}
+
+// RewindEvergreenCampaign manually rewinds last_subscriber_id=0 for a single
+// evergreen+running campaign so the next manager tick re-scans the entire
+// target list. Already-sent subs are filtered out by next-campaign-subscribers
+// via the campaign_send_log NOT EXISTS dedup. Solomon fork — exposed by the
+// "Rewind to start" button in the UI.
+func (c *Core) RewindEvergreenCampaign(id int) error {
+	res, err := c.q.ResetEvergreenProgress.Exec(pq.Int64Array{int64(id)})
+	if err != nil {
+		c.log.Printf("error rewinding evergreen campaign %d: %v", id, err)
+		return echo.NewHTTPError(http.StatusInternalServerError,
+			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.campaign}", "error", pqErrMsg(err)))
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		// Either the campaign isn't evergreen or isn't running — return a
+		// useful 400 so the UI can show the right message.
+		return echo.NewHTTPError(http.StatusBadRequest,
+			"Campaign must be is_evergreen=true and status=running to rewind")
+	}
+	return nil
 }
 
 // UpdateCampaignArchive updates a campaign's archive properties.

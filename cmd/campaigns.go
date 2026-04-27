@@ -379,6 +379,41 @@ func (a *App) UpdateCampaignStatus(c echo.Context) error {
 	return c.JSON(http.StatusOK, okResp{out})
 }
 
+// UpdateCampaignEvergreen toggles is_evergreen on a campaign regardless of status.
+// Solomon fork — exposed at PUT /api/campaigns/:id/evergreen for the UI's
+// standalone Evergreen switch.
+func (a *App) UpdateCampaignEvergreen(c echo.Context) error {
+	id := getID(c)
+	if err := a.checkCampaignPerm(auth.PermTypeManage, id, c); err != nil {
+		return err
+	}
+	req := struct {
+		IsEvergreen bool `json:"is_evergreen"`
+	}{}
+	if err := c.Bind(&req); err != nil {
+		return err
+	}
+	out, err := a.core.UpdateCampaignEvergreen(id, req.IsEvergreen)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, okResp{out})
+}
+
+// RewindCampaign rewinds last_subscriber_id=0 on an evergreen+running campaign
+// so the next scan reprocesses the list. Solomon fork — exposed at
+// POST /api/campaigns/:id/rewind for the UI's "Rewind to start" button.
+func (a *App) RewindCampaign(c echo.Context) error {
+	id := getID(c)
+	if err := a.checkCampaignPerm(auth.PermTypeManage, id, c); err != nil {
+		return err
+	}
+	if err := a.core.RewindEvergreenCampaign(id); err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, okResp{true})
+}
+
 // UpdateCampaignArchive handles campaign status modification.
 func (a *App) UpdateCampaignArchive(c echo.Context) error {
 	id := getID(c)

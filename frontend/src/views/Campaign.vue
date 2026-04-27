@@ -137,6 +137,36 @@
                   </div>
                 </div>
 
+                <!-- Solomon fork: Evergreen drip mode + Rewind button. Always
+                     editable (even on running/finished/cancelled campaigns) since
+                     it only flips one column and triggers a manager rescan. -->
+                <hr />
+                <div class="columns">
+                  <div class="column is-4">
+                    <b-field label="Evergreen (drip mode)" data-cy="btn-evergreen"
+                      message="Stays running and re-sends to new list subscribers. Sent recipients deduped via campaign_send_log.">
+                      <b-switch data-cy="btn-evergreen" v-model="form.isEvergreen"
+                        @input="onToggleEvergreen" :disabled="isNew" />
+                    </b-field>
+                  </div>
+                  <div class="column is-4" v-if="form.isEvergreen && !isNew">
+                    <b-field label="Rewind"
+                      message="Resets last_subscriber_id=0 so the manager re-scans the entire list. Already-sent recipients stay deduped.">
+                      <b-button @click="onRewindCampaign" :loading="loading.campaigns"
+                        type="is-warning" icon-left="rotate-left" data-cy="btn-rewind"
+                        :disabled="data.status !== 'running'">
+                        Rewind to start
+                      </b-button>
+                    </b-field>
+                  </div>
+                  <div class="column is-4" v-if="form.isEvergreen && !isNew && data.status !== 'running'">
+                    <p class="is-size-7 has-text-grey">
+                      To rewind, set status to <b>Running</b> first
+                      ({{ data.status }}) — change it from the campaign list page.
+                    </p>
+                  </div>
+                </div>
+
                 <div>
                   <p class="has-text-right">
                     <a href="#" @click.prevent="onShowHeaders" data-cy="btn-headers">
@@ -249,15 +279,8 @@
                 </div>
               </b-field>
             </div>
-            <!-- Solomon fork: evergreen toggle. When true the campaign stays
-                 in 'running' status after draining its initial recipients
-                 and re-sends to newly-added list subscribers on a schedule. -->
-            <div class="column is-4">
-              <b-field label="Evergreen (drip mode)" data-cy="btn-evergreen"
-                message="Stays running and re-sends to new list subscribers. Existing recipients are deduped via campaign_send_log.">
-                <b-switch data-cy="btn-evergreen" v-model="form.isEvergreen" :disabled="!canEdit" />
-              </b-field>
-            </div>
+            <!-- Evergreen toggle now lives on the main tab — see top of form. -->
+            <div class="column is-4" />
             <div class="column is-8">
               <b-field grouped position="is-right">
                 <b-field v-if="!canEdit && canArchive">
@@ -772,6 +795,32 @@ export default Vue.extend({
       this.$api.updateCampaignArchive(this.data.id, data).then((d) => {
         this.form.archiveSlug = d.archiveSlug;
       });
+    },
+
+    // Solomon fork: standalone Evergreen toggle. Persists immediately on
+    // change so admins can flip running/finished/cancelled campaigns into
+    // drip mode without going through the full UpdateCampaign path.
+    onToggleEvergreen(val) {
+      if (this.isNew) return;
+      this.$api.updateCampaignEvergreen(this.data.id, val).then(() => {
+        this.$utils.toast(val ? 'Evergreen drip mode enabled' : 'Evergreen disabled');
+      }).catch(() => {
+        // Revert the switch on failure.
+        this.form.isEvergreen = !val;
+      });
+    },
+
+    // Solomon fork: rewind an evergreen+running campaign so it re-scans
+    // its target list(s). Already-sent subs stay deduped via send_log.
+    onRewindCampaign() {
+      this.$utils.confirm(
+        'Rewind this campaign? It will re-scan all list subscribers; already-sent recipients are skipped via the send log.',
+        () => {
+          this.$api.rewindCampaign(this.data.id).then(() => {
+            this.$utils.toast('Campaign rewound — manager will pick up new sends within ~30s.');
+          });
+        },
+      );
     },
 
     // Starts or schedule a campaign.

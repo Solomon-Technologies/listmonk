@@ -90,6 +90,7 @@ type Queries struct {
 	RefreshCampaignsToSend   *sqlx.Stmt `query:"refresh-campaigns-to-send"`
 	GetEvergreenCampaignsWithNewSubs *sqlx.Stmt `query:"get-evergreen-campaigns-with-new-subs"`
 	ResetEvergreenProgress           *sqlx.Stmt `query:"reset-evergreen-progress"`
+	SetCampaignEvergreen             *sqlx.Stmt `query:"set-campaign-evergreen"`
 	RegisterCampaignView      *sqlx.Stmt `query:"register-campaign-view"`
 	InsertCampaignSendLog     *sqlx.Stmt `query:"insert-campaign-send-log"`
 	QueryCampaignSendLog      *sqlx.Stmt `query:"query-campaign-send-log"`
