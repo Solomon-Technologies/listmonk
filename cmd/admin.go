@@ -145,7 +145,7 @@ func (a *App) GetServerConfig(c echo.Context) error {
 // GetDashboardCharts returns chart data points to render ont he dashboard.
 func (a *App) GetDashboardCharts(c echo.Context) error {
 	// Get the chart data from the DB.
-	out, err := a.core.GetDashboardCharts()
+	out, err := a.core.GetDashboardCharts(a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (a *App) GetDashboardCharts(c echo.Context) error {
 // GetDashboardCounts returns stats counts to show on the dashboard.
 func (a *App) GetDashboardCounts(c echo.Context) error {
 	// Get the chart data from the DB.
-	out, err := a.core.GetDashboardCounts()
+	out, err := a.core.GetDashboardCounts(a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (a *App) GetDashboardCounts(c echo.Context) error {
 
 // GetDashboardFeatureCounts returns counts for Solomon platform features.
 func (a *App) GetDashboardFeatureCounts(c echo.Context) error {
-	out, err := a.core.GetDashboardFeatureCounts()
+	out, err := a.core.GetDashboardFeatureCounts(a.tenantFilter(c))
 	if err != nil {
 		return err
 	}

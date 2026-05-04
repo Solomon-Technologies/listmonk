@@ -1,3 +1,6 @@
+# Solomon: agent scratch (local-only archives of removed work)
+.codex-archive/
+
 frontend/node_modules/
 frontend/.cache/
 frontend/yarn.lock

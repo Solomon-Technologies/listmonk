@@ -416,6 +416,16 @@ func V7_17_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf, lo *log.Logge
 	// left for Alchemy to create via the admin UI after the migration
 	// runs — passwords are set there.
 	// --------------------------------------------------------------------
+	// Tenant Super Admin: full access to ALL of their tenant's data
+	// (lists/subscribers/campaigns/templates/segments/drips/automations/
+	// scoring/ab_tests/webhooks/deals/activities/warming/media/bounces).
+	//
+	// EXCLUDED — these are platform-tier perms reserved for the legacy
+	// super admin (role_id=1, alch3my@solomontech.co):
+	//   users:* / roles:* / settings:*
+	// A tenant Super Admin cannot invite users into their tenant, modify
+	// roles, or change global SMTP/site/CAPTCHA settings. Platform admin
+	// (Solomon company_id=1, role_id=1) handles those operations.
 	if _, err := tx.Exec(`
 		INSERT INTO roles (type, name, permissions, company_id)
 		VALUES (
@@ -429,9 +439,6 @@ func V7_17_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf, lo *log.Logge
 				'bounces:get', 'bounces:manage',
 				'media:get', 'media:manage',
 				'templates:get', 'templates:manage',
-				'users:get', 'users:manage',
-				'roles:get', 'roles:manage',
-				'settings:get', 'settings:manage', 'settings:maintain',
 				'segments:get', 'segments:manage',
 				'webhooks:get', 'webhooks:manage',
 				'drips:get', 'drips:manage',
