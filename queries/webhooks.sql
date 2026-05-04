@@ -1,8 +1,9 @@
 -- webhooks
 
 -- name: create-webhook
-INSERT INTO webhooks (uuid, name, url, secret, enabled, events, max_retries, timeout_seconds)
-    VALUES($1, $2, $3, $4, $5, $6::TEXT[], $7, $8) RETURNING id;
+-- $9 = company_id (v7.17.0); 0 falls back to Solomon=1.
+INSERT INTO webhooks (uuid, name, url, secret, enabled, events, max_retries, timeout_seconds, company_id)
+    VALUES($1, $2, $3, $4, $5, $6::TEXT[], $7, $8, COALESCE(NULLIF($9::INT, 0), 1)) RETURNING id;
 
 -- name: query-webhooks
 SELECT COUNT(*) OVER () AS total, webhooks.* FROM webhooks WHERE
@@ -12,12 +13,15 @@ SELECT COUNT(*) OVER () AS total, webhooks.* FROM webhooks WHERE
         WHEN $3 != '' THEN (name ILIKE $3)
         ELSE TRUE
     END
+    -- Multi-tenant filter (v7.17.0): $6=0 disables.
+    AND ($6::INT = 0 OR company_id = $6::INT)
     ORDER BY %order%
     OFFSET $4 LIMIT (CASE WHEN $5 < 1 THEN NULL ELSE $5 END);
 
 -- name: get-webhook
 SELECT * FROM webhooks WHERE
-    CASE WHEN $1 > 0 THEN id = $1 ELSE uuid = $2::UUID END;
+    CASE WHEN $1 > 0 THEN id = $1 ELSE uuid = $2::UUID END
+    AND ($3::INT = 0 OR company_id = $3::INT);
 
 -- name: update-webhook
 UPDATE webhooks SET

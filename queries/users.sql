@@ -1,5 +1,5 @@
 -- name: create-user
-INSERT INTO users (username, password_login, password, email, name, type, user_role_id, list_role_id, status)
+INSERT INTO users (username, password_login, password, email, name, type, user_role_id, list_role_id, status, company_id)
     VALUES($1, $2, (
         CASE
             -- For user types with password_login enabled, bcrypt and store the hash of the password.
@@ -10,7 +10,7 @@ INSERT INTO users (username, password_login, password, email, name, type, user_r
                 THEN $3
             ELSE NULL
         END
-    ), $4, $5, $6, (SELECT id FROM roles WHERE id = $7 AND type = 'user'), (SELECT id FROM roles WHERE id = $8 AND type = 'list'), $9) RETURNING id;
+    ), $4, $5, $6, (SELECT id FROM roles WHERE id = $7 AND type = 'user'), (SELECT id FROM roles WHERE id = $8 AND type = 'list'), $9, COALESCE(NULLIF($10, 0), 1)) RETURNING id;
 
 -- name: update-user
 WITH u AS (
@@ -78,11 +78,13 @@ SELECT
     ur.permissions AS user_role_permissions,
     lp.list_role_id,
     lr.name AS list_role_name,
-    lp.list_role_perms
+    lp.list_role_perms,
+    co.name AS company_name
 FROM users
     LEFT JOIN ur ON users.user_role_id = ur.id
     LEFT JOIN lp ON users.list_role_id = lp.list_role_id
     LEFT JOIN lr ON lp.list_role_id = lr.id
+    LEFT JOIN companies co ON users.company_id = co.id
     ORDER BY users.created_at;
 
 -- name: get-user
@@ -104,7 +106,8 @@ SELECT
     ur.permissions AS user_role_permissions,
     lr.id AS list_role_id,
     lr.name AS list_role_name,
-    lp.list_role_perms
+    lp.list_role_perms,
+    co.name AS company_name
 FROM sel
     LEFT JOIN roles ur ON sel.user_role_id = ur.id AND ur.type = 'user' AND ur.parent_id IS NULL
     LEFT JOIN (
@@ -113,6 +116,7 @@ FROM sel
         LEFT JOIN lists l ON r.list_id = l.id
         WHERE r.type = 'list' AND r.parent_id IS NULL
     ) lr ON sel.list_role_id = lr.id
+    LEFT JOIN companies co ON sel.company_id = co.id
     LEFT JOIN LATERAL (
         SELECT JSONB_AGG(
                 JSONB_BUILD_OBJECT(

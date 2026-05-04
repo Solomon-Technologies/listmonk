@@ -66,7 +66,7 @@ func (a *App) GetSubscriber(c echo.Context) error {
 	}
 
 	// Fetch the subscriber from the DB.
-	out, err := a.core.GetSubscriber(id, "", "")
+	out, err := a.core.GetSubscriber(id, "", "", a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func (a *App) QuerySubscribers(c echo.Context) error {
 	)
 
 	// Query subscribers from the DB.
-	res, total, err := a.core.QuerySubscribers(searchStr, query, listIDs, subStatus, order, orderBy, pg.Offset, pg.Limit)
+	res, total, err := a.core.QuerySubscribers(searchStr, query, listIDs, subStatus, order, orderBy, pg.Offset, pg.Limit, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -311,7 +311,7 @@ func (a *App) SubscriberSendOptin(c echo.Context) error {
 		return err
 	}
 
-	out, err := a.core.GetSubscriber(id, "", "")
+	out, err := a.core.GetSubscriber(id, "", "", a.tenantFilter(c))
 	if err != nil {
 		return err
 	}

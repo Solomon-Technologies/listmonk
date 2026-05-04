@@ -5,6 +5,14 @@
 # port, use port 80 (this will require running with elevated permissions).
 address = "localhost:9000"
 
+# Multi-tenant isolation (Solomon fork, v7.17.0+).
+# When true, every tenant-scoped query filters by user.company_id and a
+# CompanyScopeMiddleware enforces that any :id resource belongs to the
+# requesting user's company. When false (default), the schema is in place
+# but handlers run in dual-mode — no isolation enforcement. Flip to true
+# only after smoke-testing a tenant's view.
+enforce_company_isolation = false
+
 # Database.
 [db]
 host = "localhost"

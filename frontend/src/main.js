@@ -77,6 +77,24 @@ async function initConfig(app) {
     return profile.listRole.lists.some((list) => list.id === id && list.permissions.includes(perm));
   };
 
+  // $canCompany checks if the logged-in user belongs to the given company.
+  // Multi-tenant scoping (v7.17.0+). When the backend's
+  // app.enforce_company_isolation is true, every tenant-scoped resource
+  // returned by the API has already been filtered server-side; this helper
+  // is for UI-only conditional rendering (e.g. hiding cross-tenant references
+  // that might leak through caches or pre-flag-flip stale data).
+  Vue.prototype.$canCompany = (id) => {
+    if (!id) return true;
+    return profile.company_id === id;
+  };
+
+  // Expose the user's company info on the prototype so templates can render
+  // a tenant badge without having to re-fetch the profile.
+  Vue.prototype.$company = {
+    id: profile.company_id || 0,
+    name: profile.company_name || '',
+  };
+
   // Set the page title after i18n has loaded.
   const to = router.history.current;
   const title = to.meta.title ? `${i18n.tc(to.meta.title, 0)} /` : '';

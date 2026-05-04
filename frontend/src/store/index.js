@@ -45,6 +45,7 @@ export default new Vuex.Store({
     [models.profile]: (state) => state[models.profile],
     [models.userRoles]: (state) => state[models.userRoles],
     [models.listRoles]: (state) => state[models.listRoles],
+    [models.companies]: (state) => state[models.companies],
     [models.settings]: (state) => state[models.settings],
     [models.serverConfig]: (state) => state[models.serverConfig],
     [models.logs]: (state) => state[models.logs],

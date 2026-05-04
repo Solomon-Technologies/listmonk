@@ -6,6 +6,8 @@ SELECT * FROM lists WHERE (CASE WHEN $1 = '' THEN 1=1 ELSE type=$1::list_type EN
         -- Optional list IDs based on user permission.
         WHEN $4 = TRUE THEN TRUE ELSE id = ANY($5::INT[])
     END
+    -- Multi-tenant filter (v7.17.0): when $6=0 isolation is disabled, otherwise scope to company.
+    AND ($6::INT = 0 OR company_id = $6::INT)
     ORDER BY CASE WHEN $3 = 'id' THEN id END, CASE WHEN $3 = 'name' THEN name END;
 
 -- name: query-lists
@@ -25,6 +27,8 @@ WITH ls AS (
         -- Optional list IDs based on user permission.
         WHEN $8 = TRUE THEN TRUE ELSE id = ANY($9::INT[])
     END
+    -- Multi-tenant filter (v7.17.0): $12=0 disables, else scope to company.
+    AND ($12::INT = 0 OR company_id = $12::INT)
     OFFSET $10 LIMIT (CASE WHEN $11 < 1 THEN NULL ELSE $11 END)
 ),
 statuses AS (
@@ -53,7 +57,9 @@ SELECT id, uuid, type FROM lists WHERE
     END);
 
 -- name: create-list
-INSERT INTO lists (uuid, name, type, optin, status, tags, description) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id;
+-- $8 = company_id; defaults to 1 (Solomon) when 0/unset for backward compat.
+INSERT INTO lists (uuid, name, type, optin, status, tags, description, company_id)
+    VALUES($1, $2, $3, $4, $5, $6, $7, COALESCE(NULLIF($8::INT, 0), 1)) RETURNING id;
 
 -- name: update-list
 WITH l AS (

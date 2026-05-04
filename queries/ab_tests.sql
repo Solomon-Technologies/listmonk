@@ -1,15 +1,18 @@
 -- A/B tests
 
 -- name: create-ab-test
-INSERT INTO ab_tests (uuid, campaign_id, test_type, status, test_percentage, winner_metric, winner_wait_hours)
-    VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id;
+-- $8 = company_id (v7.17.0); 0 falls back to Solomon=1.
+INSERT INTO ab_tests (uuid, campaign_id, test_type, status, test_percentage, winner_metric, winner_wait_hours, company_id)
+    VALUES($1, $2, $3, $4, $5, $6, $7, COALESCE(NULLIF($8::INT, 0), 1)) RETURNING id;
 
 -- name: get-ab-test
 SELECT * FROM ab_tests WHERE
-    CASE WHEN $1 > 0 THEN id = $1 ELSE uuid = $2::UUID END;
+    CASE WHEN $1 > 0 THEN id = $1 ELSE uuid = $2::UUID END
+    AND ($3::INT = 0 OR company_id = $3::INT);
 
 -- name: get-ab-test-by-campaign
-SELECT * FROM ab_tests WHERE campaign_id = $1;
+SELECT * FROM ab_tests WHERE campaign_id = $1
+    AND ($2::INT = 0 OR company_id = $2::INT);
 
 -- name: update-ab-test
 UPDATE ab_tests SET

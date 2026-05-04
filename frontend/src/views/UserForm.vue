@@ -82,13 +82,25 @@
           </div>
         </template>
 
-        <h5>{{ $tc('users.roles') }}</h5>
+        <h5>Company &amp; Roles</h5>
         <div class="box">
+          <div class="columns">
+            <div class="column is-12">
+              <b-field label="Company" label-position="on-border">
+                <b-select v-model="form.companyId" name="company_id" required expanded
+                          @input="onCompanyChange">
+                  <option v-for="co in companies" :value="co.id" :key="co.id">
+                    {{ co.name }}
+                  </option>
+                </b-select>
+              </b-field>
+            </div>
+          </div>
           <div class="columns">
             <div class="column is-6">
               <b-field :label="$tc('users.userRole')" label-position="on-border">
                 <b-select v-model="form.userRoleId" name="user_role" required expanded>
-                  <option v-for="r in userRoles" :value="r.id" :key="r.id">
+                  <option v-for="r in filteredUserRoles" :value="r.id" :key="r.id">
                     {{ r.name }}
                   </option>
                 </b-select>
@@ -99,7 +111,7 @@
               <b-field :label="$tc('users.listRole', 0)" label-position="on-border">
                 <b-select v-model="form.listRoleId" name="list_role" expanded>
                   <option value="">&mdash; {{ $t("globals.terms.none") }} &mdash;</option>
-                  <option v-for="r in listRoles" :value="r.id" :key="r.id">
+                  <option v-for="r in filteredListRoles" :value="r.id" :key="r.id">
                     {{ r.name }}
                   </option>
                 </b-select>
@@ -154,6 +166,7 @@ export default Vue.extend({
         passwordLogin: false,
         type: 'user',
         status: 'enabled',
+        companyId: 1,
       },
       apiToken: null,
     };
@@ -186,7 +199,7 @@ export default Vue.extend({
 
     createUser() {
       const form = {
-        ...this.form, password_login: this.form.passwordLogin, user_role_id: this.form.userRoleId, list_role_id: this.form.listRoleId || null,
+        ...this.form, password_login: this.form.passwordLogin, user_role_id: this.form.userRoleId, list_role_id: this.form.listRoleId || null, company_id: this.form.companyId,
       };
       this.$api.createUser(form).then((data) => {
         this.$emit('finished');
@@ -205,7 +218,7 @@ export default Vue.extend({
 
     updateUser() {
       const form = {
-        ...this.form, password_login: this.form.passwordLogin, user_role_id: this.form.userRoleId, list_role_id: this.form.listRoleId || null,
+        ...this.form, password_login: this.form.passwordLogin, user_role_id: this.form.userRoleId, list_role_id: this.form.listRoleId || null, company_id: this.form.companyId,
       };
       this.$api.updateUser({ id: this.data.id, ...form }).then((data) => {
         this.$emit('finished');
@@ -219,14 +232,36 @@ export default Vue.extend({
       // Otherwise, all fields are valid except API.
       return !this.$props.isEditing || (this.form.type === 'api' ? t === 'api' : t !== 'api');
     },
+
+    // Reset role selections when the company changes so a stale role
+    // belonging to the old tenant doesn't get submitted.
+    onCompanyChange() {
+      this.form.userRoleId = null;
+      this.form.listRoleId = '';
+    },
   },
 
   computed: {
-    ...mapState(['loading', 'userRoles', 'listRoles']),
+    ...mapState(['loading', 'userRoles', 'listRoles', 'companies']),
+
+    // Roles where role.companyId matches the picked company.
+    // (axios interceptor camelCases the API's `company_id` → `companyId`.)
+    // Roles without an explicit companyId (legacy / id=1 super admin)
+    // are visible only when company_id=1 (Solomon) is selected.
+    filteredUserRoles() {
+      const co = this.form.companyId || 1;
+      return (this.userRoles || []).filter((r) => (r.companyId || 1) === co);
+    },
+    filteredListRoles() {
+      const co = this.form.companyId || 1;
+      return (this.listRoles || []).filter((r) => (r.companyId || 1) === co);
+    },
   },
 
   mounted() {
     this.form = { ...this.form, ...this.$props.data };
+    // Inherit company from the user being edited (or default to Solomon=1).
+    this.form.companyId = this.$props.data.companyId || this.$props.data.company_id || 1;
     if (this.$props.data.userRole) {
       this.form.userRoleId = this.$props.data.userRole.id;
     }
@@ -235,6 +270,7 @@ export default Vue.extend({
 
     this.$api.getUserRoles();
     this.$api.getListRoles();
+    this.$api.getCompanies();
 
     this.$nextTick(() => {
       this.$refs.focus.focus();

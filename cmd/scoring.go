@@ -3,13 +3,14 @@ package main
 import (
 	"net/http"
 
+	"github.com/knadh/listmonk/internal/auth"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v4"
 )
 
 // GetScoringRules handles retrieval of all scoring rules.
 func (a *App) GetScoringRules(c echo.Context) error {
-	out, err := a.core.GetScoringRules()
+	out, err := a.core.GetScoringRules(a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -21,7 +22,7 @@ func (a *App) GetScoringRules(c echo.Context) error {
 func (a *App) GetScoringRule(c echo.Context) error {
 	id := getID(c)
 
-	out, err := a.core.GetScoringRule(id)
+	out, err := a.core.GetScoringRule(id, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -44,7 +45,8 @@ func (a *App) CreateScoringRule(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid event_type: "+o.EventType)
 	}
 
-	out, err := a.core.CreateScoringRule(o)
+	user := auth.GetUser(c)
+	out, err := a.core.CreateScoringRule(o, user.CompanyID)
 	if err != nil {
 		return err
 	}

@@ -125,6 +125,8 @@
         data-cy="userRoles" icon="newspaper-variant-outline" :label="$t('users.userRoles')" />
       <b-menu-item v-if="$can('roles:get')" :to="{ name: 'listRoles' }" tag="router-link" :active="activeItem.listRoles"
         data-cy="listRoles" icon="format-list-bulleted-square" :label="$t('users.listRoles')" />
+      <b-menu-item v-if="$can('users:get')" :to="{ name: 'companies' }" tag="router-link"
+        :active="activeItem.companies" data-cy="companies" icon="domain" label="Companies" />
     </b-menu-item><!-- users -->
 
     <b-menu-item v-if="$can('settings:*')" :expanded="activeGroup.settings" :active="activeGroup.settings"

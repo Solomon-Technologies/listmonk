@@ -299,6 +299,14 @@ type Queries struct {
 	DeleteRole            *sqlx.Stmt `query:"delete-role"`
 	UpsertListPermissions *sqlx.Stmt `query:"upsert-list-permissions"`
 	DeleteListPermission  *sqlx.Stmt `query:"delete-list-permission"`
+
+	// Companies (multi-tenant, v7.17.0+).
+	GetCompanies     *sqlx.Stmt `query:"get-companies"`
+	GetCompany       *sqlx.Stmt `query:"get-company"`
+	CreateCompany    *sqlx.Stmt `query:"create-company"`
+	UpdateCompany    *sqlx.Stmt `query:"update-company"`
+	DeleteCompany    *sqlx.Stmt `query:"delete-company"`
+	GetCompanyStats  *sqlx.Stmt `query:"get-company-stats"`
 }
 
 // compileSubscriberQueryTpl takes an arbitrary WHERE expressions

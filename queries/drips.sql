@@ -1,8 +1,9 @@
 -- drip campaigns
 
 -- name: create-drip-campaign
-INSERT INTO drip_campaigns (uuid, name, description, status, trigger_type, trigger_config, segment_id, from_email)
-    VALUES($1, $2, $3, $4, $5::drip_trigger_type, $6, $7, $8) RETURNING id;
+-- $9 = company_id (v7.17.0); 0 falls back to Solomon=1.
+INSERT INTO drip_campaigns (uuid, name, description, status, trigger_type, trigger_config, segment_id, from_email, company_id)
+    VALUES($1, $2, $3, $4, $5::drip_trigger_type, $6, $7, $8, COALESCE(NULLIF($9::INT, 0), 1)) RETURNING id;
 
 -- name: query-drip-campaigns
 SELECT COUNT(*) OVER () AS total, drip_campaigns.* FROM drip_campaigns WHERE
@@ -12,12 +13,15 @@ SELECT COUNT(*) OVER () AS total, drip_campaigns.* FROM drip_campaigns WHERE
         WHEN $3 != '' THEN (name ILIKE $3)
         ELSE TRUE
     END
+    -- Multi-tenant filter (v7.17.0): $6=0 disables.
+    AND ($6::INT = 0 OR company_id = $6::INT)
     ORDER BY %order%
     OFFSET $4 LIMIT (CASE WHEN $5 < 1 THEN NULL ELSE $5 END);
 
 -- name: get-drip-campaign
 SELECT * FROM drip_campaigns WHERE
-    CASE WHEN $1 > 0 THEN id = $1 ELSE uuid = $2::UUID END;
+    CASE WHEN $1 > 0 THEN id = $1 ELSE uuid = $2::UUID END
+    AND ($3::INT = 0 OR company_id = $3::INT);
 
 -- name: update-drip-campaign
 UPDATE drip_campaigns SET

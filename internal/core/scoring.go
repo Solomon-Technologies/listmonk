@@ -9,9 +9,10 @@ import (
 )
 
 // GetScoringRules returns all scoring rules.
-func (c *Core) GetScoringRules() (models.ScoringRules, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetScoringRules(companyID int) (models.ScoringRules, error) {
 	var out models.ScoringRules
-	if err := c.q.GetScoringRules.Select(&out); err != nil {
+	if err := c.q.GetScoringRules.Select(&out, companyID); err != nil {
 		c.log.Printf("error fetching scoring rules: %v", err)
 		return nil, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "scoring rules", "error", pqErrMsg(err)))
@@ -20,29 +21,30 @@ func (c *Core) GetScoringRules() (models.ScoringRules, error) {
 }
 
 // GetScoringRule returns a single scoring rule.
-func (c *Core) GetScoringRule(id int) (models.ScoringRule, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetScoringRule(id, companyID int) (models.ScoringRule, error) {
 	var out models.ScoringRule
-	if err := c.q.GetScoringRule.Get(&out, id); err != nil {
+	if err := c.q.GetScoringRule.Get(&out, id, companyID); err != nil {
 		return out, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "scoring rule", "error", pqErrMsg(err)))
 	}
 	return out, nil
 }
 
-// CreateScoringRule creates a new scoring rule.
-func (c *Core) CreateScoringRule(o models.ScoringRule) (models.ScoringRule, error) {
+// CreateScoringRule creates a new scoring rule. companyID stamps tenant.
+func (c *Core) CreateScoringRule(o models.ScoringRule, companyID int) (models.ScoringRule, error) {
 	if o.Conditions == nil {
 		o.Conditions = []byte("{}")
 	}
 
 	var id int
-	if err := c.q.CreateScoringRule.Get(&id, o.Name, o.Enabled, o.EventType, o.ScoreValue, o.Conditions); err != nil {
+	if err := c.q.CreateScoringRule.Get(&id, o.Name, o.Enabled, o.EventType, o.ScoreValue, o.Conditions, companyID); err != nil {
 		c.log.Printf("error creating scoring rule: %v", err)
 		return models.ScoringRule{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "scoring rule", "error", pqErrMsg(err)))
 	}
 
-	return c.GetScoringRule(id)
+	return c.GetScoringRule(id, 0)
 }
 
 // UpdateScoringRule updates a scoring rule.
@@ -62,7 +64,7 @@ func (c *Core) UpdateScoringRule(id int, o models.ScoringRule) (models.ScoringRu
 			c.i18n.Ts("globals.messages.notFound", "name", "scoring rule"))
 	}
 
-	return c.GetScoringRule(id)
+	return c.GetScoringRule(id, 0)
 }
 
 // DeleteScoringRule deletes a scoring rule.

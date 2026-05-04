@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/knadh/listmonk/internal/auth"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v4"
 )
@@ -38,7 +39,7 @@ func (a *App) GetTemplate(c echo.Context) error {
 
 	// Get the template from the DB.
 	id := getID(c)
-	out, err := a.core.GetTemplate(id, noBody)
+	out, err := a.core.GetTemplate(id, noBody, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -52,7 +53,7 @@ func (a *App) GetTemplates(c echo.Context) error {
 	noBody, _ := strconv.ParseBool(c.QueryParam("no_body"))
 
 	// Fetch templates from the DB.
-	out, err := a.core.GetTemplates("", noBody)
+	out, err := a.core.GetTemplates("", noBody, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -64,7 +65,7 @@ func (a *App) GetTemplates(c echo.Context) error {
 func (a *App) PreviewTemplate(c echo.Context) error {
 	// Fetch one template from the DB.
 	id := getID(c)
-	tpl, err := a.core.GetTemplate(id, false)
+	tpl, err := a.core.GetTemplate(id, false, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -129,8 +130,9 @@ func (a *App) CreateTemplate(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	// Create the template the in the DB.
-	out, err := a.core.CreateTemplate(o.Name, o.Type, o.Subject, []byte(o.Body), o.BodySource)
+	// Create the template in the DB. Stamp with the user's tenant.
+	user := auth.GetUser(c)
+	out, err := a.core.CreateTemplate(o.Name, o.Type, o.Subject, []byte(o.Body), o.BodySource, user.CompanyID)
 	if err != nil {
 		return err
 	}

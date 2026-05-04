@@ -23,7 +23,8 @@ const (
 
 // QueryCampaigns retrieves paginated campaigns optionally filtering them by the given arbitrary
 // query expression. It also returns the total number of records in the DB.
-func (c *Core) QueryCampaigns(searchStr string, statuses, tags []string, orderBy, order string, getAll bool, permittedLists []int, offset, limit int) (models.Campaigns, int, error) {
+// companyID=0 disables tenant filtering; >0 scopes results.
+func (c *Core) QueryCampaigns(searchStr string, statuses, tags []string, orderBy, order string, getAll bool, permittedLists []int, offset, limit, companyID int) (models.Campaigns, int, error) {
 	queryStr, stmt := makeSearchQuery(searchStr, orderBy, order, c.q.QueryCampaigns, campQuerySortFields)
 
 	if statuses == nil {
@@ -36,7 +37,7 @@ func (c *Core) QueryCampaigns(searchStr string, statuses, tags []string, orderBy
 
 	// Unsafe to ignore scanning fields not present in models.Campaigns.
 	var out models.Campaigns
-	if err := c.db.Select(&out, stmt, 0, pq.StringArray(statuses), pq.StringArray(tags), queryStr, getAll, pq.Array(permittedLists), offset, limit); err != nil {
+	if err := c.db.Select(&out, stmt, 0, pq.StringArray(statuses), pq.StringArray(tags), queryStr, getAll, pq.Array(permittedLists), offset, limit, companyID); err != nil {
 		c.log.Printf("error fetching campaigns: %v", err)
 		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.campaign}", "error", pqErrMsg(err)))
@@ -65,13 +66,16 @@ func (c *Core) QueryCampaigns(searchStr string, statuses, tags []string, orderBy
 }
 
 // GetCampaign retrieves a campaign.
-func (c *Core) GetCampaign(id int, uuid, archiveSlug string) (models.Campaign, error) {
-	return c.getCampaign(id, uuid, archiveSlug, campaignTplDefault)
+// companyID=0 disables tenant filtering (used for public archive/optin
+// flows); >0 scopes the lookup to a tenant.
+func (c *Core) GetCampaign(id int, uuid, archiveSlug string, companyID int) (models.Campaign, error) {
+	return c.getCampaign(id, uuid, archiveSlug, campaignTplDefault, companyID)
 }
 
 // GetArchivedCampaign retrieves a campaign with the archive template body.
+// Public-facing archive view — no tenant filter.
 func (c *Core) GetArchivedCampaign(id int, uuid, archiveSlug string) (models.Campaign, error) {
-	out, err := c.getCampaign(id, uuid, archiveSlug, campaignTplArchive)
+	out, err := c.getCampaign(id, uuid, archiveSlug, campaignTplArchive, 0)
 	if err != nil {
 		return out, err
 	}
@@ -87,7 +91,8 @@ func (c *Core) GetArchivedCampaign(id int, uuid, archiveSlug string) (models.Cam
 // getCampaign retrieves a campaign. If typlType=default, then the campaign's
 // template body is returned as "template_body". If tplType="archive",
 // the archive template is returned.
-func (c *Core) getCampaign(id int, uuid, archiveSlug string, tplType string) (models.Campaign, error) {
+// companyID=0 disables tenant filtering; >0 scopes to a tenant.
+func (c *Core) getCampaign(id int, uuid, archiveSlug string, tplType string, companyID int) (models.Campaign, error) {
 	// Unsafe to ignore scanning fields not present in models.Campaigns.
 	var uu any
 	if uuid != "" {
@@ -95,7 +100,7 @@ func (c *Core) getCampaign(id int, uuid, archiveSlug string, tplType string) (mo
 	}
 
 	var out models.Campaigns
-	if err := c.q.GetCampaign.Select(&out, id, uu, archiveSlug, tplType); err != nil {
+	if err := c.q.GetCampaign.Select(&out, id, uu, archiveSlug, tplType, companyID); err != nil {
 		// if err := c.db.Select(&out, stmt, 0, pq.Array([]string{}), queryStr, 0, 1); err != nil {
 		c.log.Printf("error fetching campaign: %v", err)
 		return models.Campaign{}, echo.NewHTTPError(http.StatusInternalServerError,
@@ -159,8 +164,9 @@ func (c *Core) GetArchivedCampaigns(offset, limit int) (models.Campaigns, int, e
 	return out, total, nil
 }
 
-// CreateCampaign creates a new campaign.
-func (c *Core) CreateCampaign(o models.Campaign, listIDs []int, mediaIDs []int) (models.Campaign, error) {
+// CreateCampaign creates a new campaign. companyID stamps the campaign's
+// tenant (caller passes user.CompanyID; 0 falls back to Solomon=1 in SQL).
+func (c *Core) CreateCampaign(o models.Campaign, listIDs []int, mediaIDs []int, companyID int) (models.Campaign, error) {
 	uu, err := uuid.NewV4()
 	if err != nil {
 		c.log.Printf("error generating UUID: %v", err)
@@ -193,6 +199,7 @@ func (c *Core) CreateCampaign(o models.Campaign, listIDs []int, mediaIDs []int) 
 		pq.Array(mediaIDs),
 		o.BodySource,
 		o.IsEvergreen,
+		companyID,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return models.Campaign{}, echo.NewHTTPError(http.StatusBadRequest, c.i18n.T("campaigns.noSubs"))
@@ -203,7 +210,8 @@ func (c *Core) CreateCampaign(o models.Campaign, listIDs []int, mediaIDs []int) 
 			c.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.campaign}", "error", pqErrMsg(err)))
 	}
 
-	out, err := c.GetCampaign(newID, "", "")
+	// Pass 0 for companyID — we just created it, no need to filter.
+	out, err := c.GetCampaign(newID, "", "", 0)
 	if err != nil {
 		return models.Campaign{}, err
 	}
@@ -240,7 +248,7 @@ func (c *Core) UpdateCampaign(id int, o models.Campaign, listIDs []int, mediaIDs
 			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.campaign}", "error", pqErrMsg(err)))
 	}
 
-	out, err := c.GetCampaign(id, "", "")
+	out, err := c.GetCampaign(id, "", "", 0)
 	if err != nil {
 		return models.Campaign{}, err
 	}
@@ -250,7 +258,7 @@ func (c *Core) UpdateCampaign(id int, o models.Campaign, listIDs []int, mediaIDs
 
 // UpdateCampaignStatus updates a campaign's status, eg: draft to running.
 func (c *Core) UpdateCampaignStatus(id int, status string) (models.Campaign, error) {
-	cm, err := c.GetCampaign(id, "", "")
+	cm, err := c.GetCampaign(id, "", "", 0)
 	if err != nil {
 		return models.Campaign{}, err
 	}
@@ -325,7 +333,7 @@ func (c *Core) UpdateCampaignEvergreen(id int, isEvergreen bool) (models.Campaig
 		return models.Campaign{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.campaign}", "error", pqErrMsg(err)))
 	}
-	return c.GetCampaign(id, "", "")
+	return c.GetCampaign(id, "", "", 0)
 }
 
 // RewindEvergreenCampaign manually rewinds last_subscriber_id=0 for a single

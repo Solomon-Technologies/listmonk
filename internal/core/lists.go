@@ -16,10 +16,11 @@ type listType struct {
 }
 
 // GetLists gets all lists optionally filtered by type and status.
-func (c *Core) GetLists(typ, status string, getAll bool, permittedIDs []int) ([]models.List, error) {
+// companyID=0 disables tenant filtering (dual-mode); >0 scopes results.
+func (c *Core) GetLists(typ, status string, getAll bool, permittedIDs []int, companyID int) ([]models.List, error) {
 	out := []models.List{}
 
-	if err := c.q.GetLists.Select(&out, typ, status, "id", getAll, pq.Array(permittedIDs)); err != nil {
+	if err := c.q.GetLists.Select(&out, typ, status, "id", getAll, pq.Array(permittedIDs), companyID); err != nil {
 		c.log.Printf("error fetching lists: %v", err)
 		return nil, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.lists}", "error", pqErrMsg(err)))
@@ -42,7 +43,8 @@ func (c *Core) GetLists(typ, status string, getAll bool, permittedIDs []int) ([]
 
 // QueryLists gets multiple lists based on multiple query params. Along with the  paginated and sliced
 // results, the total number of lists in the DB is returned.
-func (c *Core) QueryLists(searchStr, typ, optin, status string, tags []string, orderBy, order string, getAll bool, permittedIDs []int, offset, limit int) ([]models.List, int, error) {
+// companyID=0 disables tenant filtering (dual-mode); >0 scopes results.
+func (c *Core) QueryLists(searchStr, typ, optin, status string, tags []string, orderBy, order string, getAll bool, permittedIDs []int, offset, limit, companyID int) ([]models.List, int, error) {
 	_ = c.refreshCache(matListSubStats, false)
 
 	if tags == nil {
@@ -53,7 +55,7 @@ func (c *Core) QueryLists(searchStr, typ, optin, status string, tags []string, o
 		out            = []models.List{}
 		queryStr, stmt = makeSearchQuery(searchStr, orderBy, order, c.q.QueryLists, listQuerySortFields)
 	)
-	if err := c.db.Select(&out, stmt, 0, "", queryStr, typ, optin, status, pq.StringArray(tags), getAll, pq.Array(permittedIDs), offset, limit); err != nil {
+	if err := c.db.Select(&out, stmt, 0, "", queryStr, typ, optin, status, pq.StringArray(tags), getAll, pq.Array(permittedIDs), offset, limit, companyID); err != nil {
 		c.log.Printf("error fetching lists: %v", err)
 		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.lists}", "error", pqErrMsg(err)))
@@ -75,7 +77,10 @@ func (c *Core) QueryLists(searchStr, typ, optin, status string, tags []string, o
 }
 
 // GetList gets a list by its ID or UUID.
-func (c *Core) GetList(id int, uuid string) (models.List, error) {
+// Pass companyID=0 to skip tenant filter (used for trusted internal flows
+// like campaign send / drip enrollment that already verified ownership).
+// Pass user.CompanyID to enforce isolation on user-facing reads.
+func (c *Core) GetList(id int, uuid string, companyID int) (models.List, error) {
 	var uu any
 	if uuid != "" {
 		uu = uuid
@@ -83,7 +88,7 @@ func (c *Core) GetList(id int, uuid string) (models.List, error) {
 
 	var res []models.List
 	queryStr, stmt := makeSearchQuery("", "", "", c.q.QueryLists, nil)
-	if err := c.db.Select(&res, stmt, id, uu, queryStr, "", "", "", pq.StringArray{}, true, nil, 0, 1); err != nil {
+	if err := c.db.Select(&res, stmt, id, uu, queryStr, "", "", "", pq.StringArray{}, true, nil, 0, 1, companyID); err != nil {
 		c.log.Printf("error fetching lists: %v", err)
 		return models.List{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.lists}", "error", pqErrMsg(err)))
@@ -145,8 +150,9 @@ func (c *Core) GetListTypes(ids []int, uuids []string) (map[any]string, error) {
 	return out, nil
 }
 
-// CreateList creates a new list.
-func (c *Core) CreateList(l models.List) (models.List, error) {
+// CreateList creates a new list. companyID stamps the list's tenant
+// (caller passes user.CompanyID; 0 falls back to Solomon=1 in SQL).
+func (c *Core) CreateList(l models.List, companyID int) (models.List, error) {
 	uu, err := uuid.NewV4()
 	if err != nil {
 		c.log.Printf("error generating UUID: %v", err)
@@ -167,13 +173,13 @@ func (c *Core) CreateList(l models.List) (models.List, error) {
 	// Insert and read ID.
 	var newID int
 	l.UUID = uu.String()
-	if err := c.q.CreateList.Get(&newID, l.UUID, l.Name, l.Type, l.Optin, l.Status, pq.StringArray(normalizeTags(l.Tags)), l.Description); err != nil {
+	if err := c.q.CreateList.Get(&newID, l.UUID, l.Name, l.Type, l.Optin, l.Status, pq.StringArray(normalizeTags(l.Tags)), l.Description, companyID); err != nil {
 		c.log.Printf("error creating list: %v", err)
 		return models.List{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.list}", "error", pqErrMsg(err)))
 	}
 
-	return c.GetList(newID, "")
+	return c.GetList(newID, "", 0)
 }
 
 // UpdateList updates a given list.
@@ -190,7 +196,7 @@ func (c *Core) UpdateList(id int, l models.List) (models.List, error) {
 			c.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.list}"))
 	}
 
-	return c.GetList(id, "")
+	return c.GetList(id, "", 0)
 }
 
 // DeleteList deletes a list.

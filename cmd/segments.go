@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	"github.com/knadh/listmonk/internal/auth"
 	"github.com/knadh/listmonk/internal/core"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v4"
@@ -19,7 +20,7 @@ func (a *App) GetSegments(c echo.Context) error {
 		order   = c.FormValue("order")
 	)
 
-	out, total, err := a.core.QuerySegments(search, tags, orderBy, order, pg.Offset, pg.Limit)
+	out, total, err := a.core.QuerySegments(search, tags, orderBy, order, pg.Offset, pg.Limit, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -36,7 +37,7 @@ func (a *App) GetSegments(c echo.Context) error {
 func (a *App) GetSegment(c echo.Context) error {
 	id := getID(c)
 
-	out, err := a.core.GetSegment(id, "")
+	out, err := a.core.GetSegment(id, "", a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -59,7 +60,8 @@ func (a *App) CreateSegment(c echo.Context) error {
 		o.MatchType = models.SegmentMatchAll
 	}
 
-	out, err := a.core.CreateSegment(o)
+	user := auth.GetUser(c)
+	out, err := a.core.CreateSegment(o, user.CompanyID)
 	if err != nil {
 		return err
 	}
@@ -99,7 +101,7 @@ func (a *App) DeleteSegment(c echo.Context) error {
 func (a *App) GetSegmentCount(c echo.Context) error {
 	id := getID(c)
 
-	seg, err := a.core.GetSegment(id, "")
+	seg, err := a.core.GetSegment(id, "", a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -118,7 +120,7 @@ func (a *App) GetSegmentCount(c echo.Context) error {
 func (a *App) GetSegmentSubscribers(c echo.Context) error {
 	id := getID(c)
 
-	seg, err := a.core.GetSegment(id, "")
+	seg, err := a.core.GetSegment(id, "", a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -132,7 +134,7 @@ func (a *App) GetSegmentSubscribers(c echo.Context) error {
 	pg := a.pg.NewFromURL(c.Request().URL.Query())
 
 	// Query subscribers with the segment's WHERE clause using the existing infrastructure.
-	out, total, err := a.core.QuerySubscribers("", queryExp, nil, "", "id", "asc", pg.Offset, pg.Limit)
+	out, total, err := a.core.QuerySubscribers("", queryExp, nil, "", "id", "asc", pg.Offset, pg.Limit, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}

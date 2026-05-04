@@ -88,9 +88,11 @@ func (s *store) ResetEvergreenProgress(ids []int64) error {
 }
 
 // GetCampaign fetches a campaign from the database.
+// Internal manager flow (campaign send pipeline) — pass companyID=0 to
+// disable tenant filter; the manager already operates on records it owns.
 func (s *store) GetCampaign(campID int) (*models.Campaign, error) {
 	var out = &models.Campaign{}
-	err := s.queries.GetCampaign.Get(out, campID, nil, nil, "default")
+	err := s.queries.GetCampaign.Get(out, campID, nil, nil, "default", 0)
 	return out, err
 }
 
@@ -108,7 +110,8 @@ func (s *store) UpdateCampaignCounts(campID int, toSend int, sent int, lastSubID
 
 // GetAttachment fetches a media attachment blob.
 func (s *store) GetAttachment(mediaID int) (models.Attachment, error) {
-	m, err := s.core.GetMedia(mediaID, "", "", s.media)
+	// Internal manager flow (campaign send pipeline) — no tenant filter.
+	m, err := s.core.GetMedia(mediaID, "", "", s.media, 0)
 	if err != nil {
 		return models.Attachment{}, err
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	"github.com/knadh/listmonk/internal/auth"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v4"
 )
@@ -16,7 +17,7 @@ func (a *App) GetWebhooks(c echo.Context) error {
 		order   = c.FormValue("order")
 	)
 
-	out, total, err := a.core.QueryWebhooks(search, orderBy, order, pg.Offset, pg.Limit)
+	out, total, err := a.core.QueryWebhooks(search, orderBy, order, pg.Offset, pg.Limit, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -33,7 +34,7 @@ func (a *App) GetWebhooks(c echo.Context) error {
 func (a *App) GetWebhook(c echo.Context) error {
 	id := getID(c)
 
-	out, err := a.core.GetWebhook(id, "")
+	out, err := a.core.GetWebhook(id, "", a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -66,7 +67,8 @@ func (a *App) CreateWebhook(c echo.Context) error {
 		o.TimeoutSeconds = 10
 	}
 
-	out, err := a.core.CreateWebhook(o)
+	user := auth.GetUser(c)
+	out, err := a.core.CreateWebhook(o, user.CompanyID)
 	if err != nil {
 		return err
 	}
@@ -136,7 +138,7 @@ func (a *App) GetWebhookLog(c echo.Context) error {
 func (a *App) TestWebhook(c echo.Context) error {
 	id := getID(c)
 
-	wh, err := a.core.GetWebhook(id, "")
+	wh, err := a.core.GetWebhook(id, "", a.tenantFilter(c))
 	if err != nil {
 		return err
 	}

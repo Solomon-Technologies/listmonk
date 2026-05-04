@@ -121,8 +121,8 @@ func (t *tplRenderer) Render(w io.Writer, name string, data any, c echo.Context)
 // GetPublicLists returns the list of public lists with minimal fields
 // required to submit a subscription.
 func (a *App) GetPublicLists(c echo.Context) error {
-	// Get all public lists.
-	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, true, nil)
+	// Get all public lists. Public/unauthenticated context — no tenant filter (companyID=0).
+	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, true, nil, 0)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("public.errorFetchingLists"))
 	}
@@ -148,7 +148,7 @@ func (a *App) GetPublicLists(c echo.Context) error {
 func (a *App) ViewCampaignMessage(c echo.Context) error {
 	// Get the campaign.
 	campUUID := c.Param("campUUID")
-	camp, err := a.core.GetCampaign(0, campUUID, "")
+	camp, err := a.core.GetCampaign(0, campUUID, "", 0)
 	if err != nil {
 		if er, ok := err.(*echo.HTTPError); ok {
 			if er.Code == http.StatusBadRequest {
@@ -163,7 +163,7 @@ func (a *App) ViewCampaignMessage(c echo.Context) error {
 
 	// Get the subscriber.
 	subUUID := c.Param("subUUID")
-	sub, err := a.core.GetSubscriber(0, subUUID, "")
+	sub, err := a.core.GetSubscriber(0, subUUID, "", 0)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.Render(http.StatusNotFound, tplMessage,
@@ -201,7 +201,7 @@ func (a *App) SubscriptionPage(c echo.Context) error {
 	)
 
 	// Get the subscriber from the DB.
-	s, err := a.core.GetSubscriber(0, subUUID, "")
+	s, err := a.core.GetSubscriber(0, subUUID, "", 0)
 	if err != nil {
 		return c.Render(http.StatusInternalServerError, tplMessage,
 			makeMsgTpl(a.i18n.T("public.errorTitle"), "", a.i18n.Ts("public.errorProcessingRequest")))
@@ -293,7 +293,7 @@ func (a *App) SubscriptionPrefs(c echo.Context) error {
 	}
 
 	// Get the subscriber from the DB.
-	sub, err := a.core.GetSubscriber(0, subUUID, "")
+	sub, err := a.core.GetSubscriber(0, subUUID, "", 0)
 	if err != nil {
 		return c.Render(http.StatusInternalServerError, tplMessage,
 			makeMsgTpl(a.i18n.T("public.errorTitle"), "", a.i18n.Ts("globals.messages.pFound",
@@ -416,8 +416,8 @@ func (a *App) SubscriptionFormPage(c echo.Context) error {
 			makeMsgTpl(a.i18n.T("public.errorTitle"), "", a.i18n.Ts("public.invalidFeature")))
 	}
 
-	// Get all public lists from the DB.
-	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, true, nil)
+	// Get all public lists from the DB. Public context — no tenant filter (companyID=0).
+	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, true, nil, 0)
 	if err != nil {
 		return c.Render(http.StatusInternalServerError, tplMessage,
 			makeMsgTpl(a.i18n.T("public.errorTitle"), "", a.i18n.Ts("public.errorFetchingLists")))
@@ -614,12 +614,12 @@ func (a *App) dispatchCampaignEngagement(event, campUUID, subUUID, clickURL stri
 	if a.webhookMgr == nil || campUUID == "" || subUUID == "" {
 		return
 	}
-	sub, err := a.core.GetSubscriber(0, subUUID, "")
+	sub, err := a.core.GetSubscriber(0, subUUID, "", 0)
 	if err != nil {
 		a.log.Printf("webhook %s: subscriber lookup failed for uuid=%s: %v", event, subUUID, err)
 		return
 	}
-	camp, err := a.core.GetCampaign(0, campUUID, "")
+	camp, err := a.core.GetCampaign(0, campUUID, "", 0)
 	if err != nil {
 		// Drip step UUIDs land here too — swallow quietly, drips fire their own events.
 		return
@@ -814,7 +814,7 @@ func (a *App) processSubForm(c echo.Context) (bool, error) {
 	// Subscriber already exists. Update subscriptions in the DB.
 	if e, ok := err.(*echo.HTTPError); ok && e.Code == http.StatusConflict {
 		// Get the subscriber from the DB by their email.
-		sub, err := a.core.GetSubscriber(0, "", req.Email)
+		sub, err := a.core.GetSubscriber(0, "", req.Email, 0)
 		if err != nil {
 			return false, err
 		}

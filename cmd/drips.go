@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/knadh/listmonk/internal/auth"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v4"
 )
@@ -17,7 +18,7 @@ func (a *App) GetDripCampaigns(c echo.Context) error {
 		order   = c.FormValue("order")
 	)
 
-	out, total, err := a.core.QueryDripCampaigns(search, orderBy, order, pg.Offset, pg.Limit)
+	out, total, err := a.core.QueryDripCampaigns(search, orderBy, order, pg.Offset, pg.Limit, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -34,7 +35,7 @@ func (a *App) GetDripCampaigns(c echo.Context) error {
 func (a *App) GetDripCampaign(c echo.Context) error {
 	id := getID(c)
 
-	out, err := a.core.GetDripCampaign(id, "")
+	out, err := a.core.GetDripCampaign(id, "", a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -53,7 +54,8 @@ func (a *App) CreateDripCampaign(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "name is required")
 	}
 
-	out, err := a.core.CreateDripCampaign(o)
+	user := auth.GetUser(c)
+	out, err := a.core.CreateDripCampaign(o, user.CompanyID)
 	if err != nil {
 		return err
 	}

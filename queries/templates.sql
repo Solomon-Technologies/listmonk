@@ -6,10 +6,14 @@ SELECT id, name, type, subject,
     (CASE WHEN $2 = false THEN body_source ELSE NULL END) as body_source,
     is_default, created_at, updated_at
     FROM templates WHERE ($1 = 0 OR id = $1) AND ($3 = '' OR type = $3::template_type)
+    -- Multi-tenant filter (v7.17.0): $4=0 disables, else scope to company.
+    AND ($4::INT = 0 OR company_id = $4::INT)
     ORDER BY created_at;
 
 -- name: create-template
-INSERT INTO templates (name, type, subject, body, body_source) VALUES($1, $2, $3, $4, $5) RETURNING id;
+-- $6 = company_id (v7.17.0); 0 falls back to Solomon=1.
+INSERT INTO templates (name, type, subject, body, body_source, company_id)
+    VALUES($1, $2, $3, $4, $5, COALESCE(NULLIF($6::INT, 0), 1)) RETURNING id;
 
 -- name: update-template
 UPDATE templates SET

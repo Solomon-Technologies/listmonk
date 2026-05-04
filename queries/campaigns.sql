@@ -25,7 +25,7 @@ WITH tpl AS (
 camp AS (
     INSERT INTO campaigns (uuid, type, name, subject, from_email, body, altbody,
         content_type, send_at, headers, attribs, tags, messenger, template_id, to_send,
-        max_subscriber_id, archive, archive_slug, archive_template_id, archive_meta, body_source, is_evergreen)
+        max_subscriber_id, archive, archive_slug, archive_template_id, archive_meta, body_source, is_evergreen, company_id)
         SELECT $1, $2, $3, $4, $5,
             -- body
             COALESCE(NULLIF($6, ''), (SELECT body FROM tpl), ''),
@@ -42,7 +42,9 @@ camp AS (
             -- body_source
             COALESCE($21, (SELECT body_source FROM tpl)),
             -- is_evergreen
-            COALESCE($22::BOOLEAN, false)
+            COALESCE($22::BOOLEAN, false),
+            -- company_id (v7.17.0): defaults to Solomon=1 when 0/unset.
+            COALESCE(NULLIF($23::INT, 0), 1)
         RETURNING id
 ),
 med AS (
@@ -82,6 +84,8 @@ WHERE ($1 = 0 OR id = $1)
             SELECT 1 FROM campaign_lists WHERE campaign_id = c.id AND list_id = ANY($6::INT[])
         )
     )
+    -- Multi-tenant filter (v7.17.0): $9=0 disables, else scope to company.
+    AND ($9::INT = 0 OR c.company_id = $9::INT)
 ORDER BY %order% OFFSET $7 LIMIT (CASE WHEN $8 < 1 THEN NULL ELSE $8 END);
 
 -- name: get-campaign
@@ -96,7 +100,9 @@ SELECT campaigns.*,
             WHEN $1 > 0 THEN campaigns.id = $1
             WHEN $3 != '' THEN campaigns.archive_slug = $3
             ELSE uuid = $2
-          END;
+          END
+    -- Multi-tenant filter (v7.17.0): $5=0 disables, else scope to company.
+    AND ($5::INT = 0 OR campaigns.company_id = $5::INT);
 
 -- name: get-archived-campaigns
 SELECT COUNT(*) OVER () AS total, campaigns.*,

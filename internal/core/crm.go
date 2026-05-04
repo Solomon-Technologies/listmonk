@@ -9,9 +9,10 @@ import (
 )
 
 // QueryDeals retrieves paginated deals.
-func (c *Core) QueryDeals(subscriberID int, status string, offset, limit int) (models.Deals, int, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) QueryDeals(subscriberID int, status string, offset, limit, companyID int) (models.Deals, int, error) {
 	var out models.Deals
-	if err := c.db.Select(&out, c.q.QueryDeals, subscriberID, status, offset, limit); err != nil {
+	if err := c.db.Select(&out, c.q.QueryDeals, subscriberID, status, offset, limit, companyID); err != nil {
 		c.log.Printf("error fetching deals: %v", err)
 		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "deals", "error", pqErrMsg(err)))
@@ -26,14 +27,15 @@ func (c *Core) QueryDeals(subscriberID int, status string, offset, limit int) (m
 }
 
 // GetDeal retrieves a deal by ID or UUID.
-func (c *Core) GetDeal(id int, uuStr string) (models.Deal, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetDeal(id int, uuStr string, companyID int) (models.Deal, error) {
 	var uu any
 	if uuStr != "" {
 		uu = uuStr
 	}
 
 	var out models.Deal
-	if err := c.q.GetDeal.Get(&out, id, uu); err != nil {
+	if err := c.q.GetDeal.Get(&out, id, uu, companyID); err != nil {
 		return out, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "deal", "error", pqErrMsg(err)))
 	}
@@ -46,8 +48,8 @@ func (c *Core) GetDeal(id int, uuStr string) (models.Deal, error) {
 	return out, nil
 }
 
-// CreateDeal creates a new deal.
-func (c *Core) CreateDeal(o models.Deal) (models.Deal, error) {
+// CreateDeal creates a new deal. companyID stamps tenant.
+func (c *Core) CreateDeal(o models.Deal, companyID int) (models.Deal, error) {
 	uu, err := uuid.NewV4()
 	if err != nil {
 		return models.Deal{}, echo.NewHTTPError(http.StatusInternalServerError,
@@ -65,13 +67,13 @@ func (c *Core) CreateDeal(o models.Deal) (models.Deal, error) {
 	}
 
 	var id int
-	if err := c.q.CreateDeal.Get(&id, uu, o.SubscriberID, o.Name, o.Value, o.Currency, o.Status, o.Stage, o.ExpectedClose, o.Notes, o.Attribs); err != nil {
+	if err := c.q.CreateDeal.Get(&id, uu, o.SubscriberID, o.Name, o.Value, o.Currency, o.Status, o.Stage, o.ExpectedClose, o.Notes, o.Attribs, companyID); err != nil {
 		c.log.Printf("error creating deal: %v", err)
 		return models.Deal{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "deal", "error", pqErrMsg(err)))
 	}
 
-	return c.GetDeal(id, "")
+	return c.GetDeal(id, "", 0)
 }
 
 // UpdateDeal updates a deal.
@@ -91,7 +93,7 @@ func (c *Core) UpdateDeal(id int, o models.Deal) (models.Deal, error) {
 			c.i18n.Ts("globals.messages.notFound", "name", "deal"))
 	}
 
-	return c.GetDeal(id, "")
+	return c.GetDeal(id, "", 0)
 }
 
 // DeleteDeal deletes a deal.

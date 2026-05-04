@@ -1,8 +1,9 @@
 -- automations
 
 -- name: create-automation
-INSERT INTO automations (uuid, name, description, status, canvas)
-    VALUES($1, $2, $3, $4, $5) RETURNING id;
+-- $6 = company_id (v7.17.0); 0 falls back to Solomon=1.
+INSERT INTO automations (uuid, name, description, status, canvas, company_id)
+    VALUES($1, $2, $3, $4, $5, COALESCE(NULLIF($6::INT, 0), 1)) RETURNING id;
 
 -- name: query-automations
 SELECT COUNT(*) OVER () AS total, automations.* FROM automations WHERE
@@ -12,12 +13,15 @@ SELECT COUNT(*) OVER () AS total, automations.* FROM automations WHERE
         WHEN $3 != '' THEN (name ILIKE $3)
         ELSE TRUE
     END
+    -- Multi-tenant filter (v7.17.0): $6=0 disables.
+    AND ($6::INT = 0 OR company_id = $6::INT)
     ORDER BY %order%
     OFFSET $4 LIMIT (CASE WHEN $5 < 1 THEN NULL ELSE $5 END);
 
 -- name: get-automation
 SELECT * FROM automations WHERE
-    CASE WHEN $1 > 0 THEN id = $1 ELSE uuid = $2::UUID END;
+    CASE WHEN $1 > 0 THEN id = $1 ELSE uuid = $2::UUID END
+    AND ($3::INT = 0 OR company_id = $3::INT);
 
 -- name: update-automation
 UPDATE automations SET

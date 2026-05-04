@@ -12,11 +12,12 @@ import (
 var webhookQuerySortFields = []string{"name", "created_at", "updated_at"}
 
 // QueryWebhooks retrieves paginated webhooks optionally filtering by search.
-func (c *Core) QueryWebhooks(searchStr, orderBy, order string, offset, limit int) (models.Webhooks, int, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) QueryWebhooks(searchStr, orderBy, order string, offset, limit, companyID int) (models.Webhooks, int, error) {
 	queryStr, stmt := makeSearchQuery(searchStr, orderBy, order, c.q.QueryWebhooks, webhookQuerySortFields)
 
 	var out models.Webhooks
-	if err := c.db.Select(&out, stmt, 0, nil, queryStr, offset, limit); err != nil {
+	if err := c.db.Select(&out, stmt, 0, nil, queryStr, offset, limit, companyID); err != nil {
 		c.log.Printf("error fetching webhooks: %v", err)
 		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "webhooks", "error", pqErrMsg(err)))
@@ -37,14 +38,15 @@ func (c *Core) QueryWebhooks(searchStr, orderBy, order string, offset, limit int
 }
 
 // GetWebhook retrieves a webhook by ID or UUID.
-func (c *Core) GetWebhook(id int, uuid string) (models.Webhook, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetWebhook(id int, uuid string, companyID int) (models.Webhook, error) {
 	var uu any
 	if uuid != "" {
 		uu = uuid
 	}
 
 	var out models.Webhook
-	if err := c.q.GetWebhook.Get(&out, id, uu); err != nil {
+	if err := c.q.GetWebhook.Get(&out, id, uu, companyID); err != nil {
 		return out, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "webhook", "error", pqErrMsg(err)))
 	}
@@ -61,8 +63,8 @@ func (c *Core) GetWebhook(id int, uuid string) (models.Webhook, error) {
 	return out, nil
 }
 
-// CreateWebhook creates a new webhook.
-func (c *Core) CreateWebhook(o models.Webhook) (models.Webhook, error) {
+// CreateWebhook creates a new webhook. companyID stamps tenant.
+func (c *Core) CreateWebhook(o models.Webhook, companyID int) (models.Webhook, error) {
 	uu, err := uuid.NewV4()
 	if err != nil {
 		c.log.Printf("error generating UUID: %v", err)
@@ -75,13 +77,13 @@ func (c *Core) CreateWebhook(o models.Webhook) (models.Webhook, error) {
 	}
 
 	var id int
-	if err := c.q.CreateWebhook.Get(&id, uu, o.Name, o.URL, o.Secret, o.Enabled, pq.StringArray(o.Events), o.MaxRetries, o.TimeoutSeconds); err != nil {
+	if err := c.q.CreateWebhook.Get(&id, uu, o.Name, o.URL, o.Secret, o.Enabled, pq.StringArray(o.Events), o.MaxRetries, o.TimeoutSeconds, companyID); err != nil {
 		c.log.Printf("error creating webhook: %v", err)
 		return models.Webhook{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "webhook", "error", pqErrMsg(err)))
 	}
 
-	return c.GetWebhook(id, "")
+	return c.GetWebhook(id, "", 0)
 }
 
 // UpdateWebhook updates a webhook.
@@ -101,7 +103,7 @@ func (c *Core) UpdateWebhook(id int, o models.Webhook) (models.Webhook, error) {
 			c.i18n.Ts("globals.messages.notFound", "name", "webhook"))
 	}
 
-	return c.GetWebhook(id, "")
+	return c.GetWebhook(id, "", 0)
 }
 
 // DeleteWebhook deletes a webhook.

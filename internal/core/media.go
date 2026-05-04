@@ -14,14 +14,15 @@ import (
 )
 
 // QueryMedia returns media entries optionally filtered by a query string.
-func (c *Core) QueryMedia(provider string, s media.Store, query string, offset, limit int) ([]media.Media, int, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) QueryMedia(provider string, s media.Store, query string, offset, limit, companyID int) ([]media.Media, int, error) {
 	out := []media.Media{}
 
 	if query != "" {
 		query = strings.ToLower(query)
 	}
 
-	if err := c.q.QueryMedia.Select(&out, fmt.Sprintf("%%%s%%", query), provider, offset, limit); err != nil {
+	if err := c.q.QueryMedia.Select(&out, fmt.Sprintf("%%%s%%", query), provider, offset, limit, companyID); err != nil {
 		return out, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching",
 				"name", "{globals.terms.media}", "error", pqErrMsg(err)))
@@ -44,14 +45,15 @@ func (c *Core) QueryMedia(provider string, s media.Store, query string, offset, 
 }
 
 // GetMedia returns a media item.
-func (c *Core) GetMedia(id int, uuid, fileName string, s media.Store) (media.Media, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetMedia(id int, uuid, fileName string, s media.Store, companyID int) (media.Media, error) {
 	var uu any
 	if uuid != "" {
 		uu = uuid
 	}
 
 	var out media.Media
-	if err := c.q.GetMedia.Get(&out, id, uu, fileName); err != nil {
+	if err := c.q.GetMedia.Get(&out, id, uu, fileName, companyID); err != nil {
 		// If it's ` sql: no rows in result set`, return a 404.
 		if err == sql.ErrNoRows {
 			return out, ErrNotFound
@@ -69,8 +71,8 @@ func (c *Core) GetMedia(id int, uuid, fileName string, s media.Store) (media.Med
 	return out, nil
 }
 
-// InsertMedia inserts a new media file into the DB.
-func (c *Core) InsertMedia(fileName, thumbName, contentType string, meta models.JSON, provider string, s media.Store) (media.Media, error) {
+// InsertMedia inserts a new media file into the DB. companyID stamps tenant.
+func (c *Core) InsertMedia(fileName, thumbName, contentType string, meta models.JSON, provider string, s media.Store, companyID int) (media.Media, error) {
 	uu, err := uuid.NewV4()
 	if err != nil {
 		c.log.Printf("error generating UUID: %v", err)
@@ -80,13 +82,13 @@ func (c *Core) InsertMedia(fileName, thumbName, contentType string, meta models.
 
 	// Write to the DB.
 	var newID int
-	if err := c.q.InsertMedia.Get(&newID, uu, fileName, thumbName, contentType, provider, meta); err != nil {
+	if err := c.q.InsertMedia.Get(&newID, uu, fileName, thumbName, contentType, provider, meta, companyID); err != nil {
 		c.log.Printf("error inserting uploaded file to db: %v", err)
 		return media.Media{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.media}", "error", pqErrMsg(err)))
 	}
 
-	return c.GetMedia(newID, "", "", s)
+	return c.GetMedia(newID, "", "", s, 0)
 }
 
 // DeleteMedia deletes a given media item and returns the filename of the deleted item.

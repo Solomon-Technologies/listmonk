@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/knadh/listmonk/internal/auth"
 	"github.com/knadh/listmonk/internal/captcha"
 	"github.com/labstack/echo/v4"
 	null "gopkg.in/volatiletech/null.v6"
@@ -76,9 +78,59 @@ func (a *App) GetServerConfig(c echo.Context) error {
 	}
 	out.Langs = langList
 
+	// Messenger picker (multi-tenant filter, v7.17.0+).
+	//
+	// Messenger names follow the convention "<base>-<company-slug>"
+	// (e.g. "email-resend-rule27", "email-resend-solomontech"). When
+	// app.enforce_company_isolation is true, exclude any messenger whose
+	// name contains another tenant's slug. Generic messengers (whose name
+	// doesn't contain any company's slug, like "email" or "postback") are
+	// shown to everyone.
+	enforce := ko.Bool("app.enforce_company_isolation")
+	var (
+		userCompanyID int
+		userSlug      string
+		otherSlugs    []string
+	)
+	if enforce {
+		user := auth.GetUser(c)
+		userCompanyID = user.CompanyID
+		type companyRow struct {
+			ID   int    `db:"id"`
+			Slug string `db:"slug"`
+		}
+		var companies []companyRow
+		// Load companies catalog. Cheap (typically <10 rows).
+		_ = a.db.Select(&companies, `SELECT id, slug FROM companies`)
+		for _, co := range companies {
+			if co.ID == userCompanyID {
+				userSlug = co.Slug
+			} else {
+				otherSlugs = append(otherSlugs, co.Slug)
+			}
+		}
+	}
 	out.Messengers = make([]string, 0, len(a.messengers))
 	for _, m := range a.messengers {
-		out.Messengers = append(out.Messengers, m.Name())
+		name := m.Name()
+		if enforce {
+			matchesOther := false
+			for _, slug := range otherSlugs {
+				if slug != "" && strings.Contains(strings.ToLower(name), strings.ToLower(slug)) {
+					matchesOther = true
+					break
+				}
+			}
+			if matchesOther {
+				// This messenger belongs to a different tenant.
+				// But if its name ALSO matches our own tenant's slug, allow it
+				// (defensive: a tenant slug being a substring of another).
+				if userSlug == "" || !strings.Contains(strings.ToLower(name), strings.ToLower(userSlug)) {
+					continue
+				}
+			}
+		}
+		out.Messengers = append(out.Messengers, name)
 	}
 
 	a.Lock()

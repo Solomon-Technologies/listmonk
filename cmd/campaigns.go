@@ -79,7 +79,7 @@ func (a *App) GetCampaigns(c echo.Context) error {
 	)
 
 	// Query and retrieve campaigns from the DB.
-	res, total, err := a.core.QueryCampaigns(query, status, tags, orderBy, order, hasAllPerm, permittedLists, pg.Offset, pg.Limit)
+	res, total, err := a.core.QueryCampaigns(query, status, tags, orderBy, order, hasAllPerm, permittedLists, pg.Offset, pg.Limit, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (a *App) GetCampaign(c echo.Context) error {
 	}
 
 	// Get the campaign from the DB.
-	out, err := a.core.GetCampaign(id, "", "")
+	out, err := a.core.GetCampaign(id, "", "", a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -288,7 +288,7 @@ func (a *App) CreateCampaign(c echo.Context) error {
 		o.ArchiveTemplateID = o.TemplateID
 	}
 
-	out, err := a.core.CreateCampaign(o.Campaign, o.ListIDs, o.MediaIDs)
+	out, err := a.core.CreateCampaign(o.Campaign, o.ListIDs, o.MediaIDs, user.CompanyID)
 	if err != nil {
 		return err
 	}
@@ -308,7 +308,7 @@ func (a *App) UpdateCampaign(c echo.Context) error {
 	}
 
 	// Retrieve the campaign from the DB.
-	cm, err := a.core.GetCampaign(id, "", "")
+	cm, err := a.core.GetCampaign(id, "", "", a.tenantFilter(c))
 	if err != nil {
 		return err
 	}

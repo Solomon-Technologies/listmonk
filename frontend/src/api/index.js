@@ -537,6 +537,39 @@ export const updateUserProfile = (data) => http.put(
   { loading: models.users, store: models.profile },
 );
 
+// Companies (multi-tenant, v7.17.0+).
+export const getCompanies = () => http.get(
+  '/api/companies',
+  { loading: models.companies, store: models.companies },
+);
+
+export const getCompanyStats = () => http.get(
+  '/api/companies/stats',
+  { loading: models.companies },
+);
+
+export const getCompany = (id) => http.get(
+  `/api/companies/${id}`,
+  { loading: models.companies },
+);
+
+export const createCompany = (data) => http.post(
+  '/api/companies',
+  data,
+  { loading: models.companies },
+);
+
+export const updateCompany = (data) => http.put(
+  `/api/companies/${data.id}`,
+  data,
+  { loading: models.companies },
+);
+
+export const deleteCompany = (id) => http.delete(
+  `/api/companies/${id}`,
+  { loading: models.companies },
+);
+
 export const getUserRoles = async () => http.get(
   '/api/roles/users',
   { loading: models.userRoles, store: models.userRoles },

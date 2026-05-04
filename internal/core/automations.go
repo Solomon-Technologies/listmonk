@@ -11,11 +11,12 @@ import (
 var automationQuerySortFields = []string{"name", "status", "created_at", "updated_at"}
 
 // QueryAutomations retrieves paginated automations.
-func (c *Core) QueryAutomations(searchStr, orderBy, order string, offset, limit int) (models.Automations, int, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) QueryAutomations(searchStr, orderBy, order string, offset, limit, companyID int) (models.Automations, int, error) {
 	queryStr, stmt := makeSearchQuery(searchStr, orderBy, order, c.q.QueryAutomations, automationQuerySortFields)
 
 	var out models.Automations
-	if err := c.db.Select(&out, stmt, 0, nil, queryStr, offset, limit); err != nil {
+	if err := c.db.Select(&out, stmt, 0, nil, queryStr, offset, limit, companyID); err != nil {
 		c.log.Printf("error fetching automations: %v", err)
 		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "automations", "error", pqErrMsg(err)))
@@ -30,14 +31,15 @@ func (c *Core) QueryAutomations(searchStr, orderBy, order string, offset, limit 
 }
 
 // GetAutomation retrieves an automation by ID or UUID with nodes and edges.
-func (c *Core) GetAutomation(id int, uuStr string) (models.Automation, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetAutomation(id int, uuStr string, companyID int) (models.Automation, error) {
 	var uu any
 	if uuStr != "" {
 		uu = uuStr
 	}
 
 	var out models.Automation
-	if err := c.q.GetAutomation.Get(&out, id, uu); err != nil {
+	if err := c.q.GetAutomation.Get(&out, id, uu, companyID); err != nil {
 		return out, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "automation", "error", pqErrMsg(err)))
 	}
@@ -56,8 +58,8 @@ func (c *Core) GetAutomation(id int, uuStr string) (models.Automation, error) {
 	return out, nil
 }
 
-// CreateAutomation creates a new automation.
-func (c *Core) CreateAutomation(o models.Automation) (models.Automation, error) {
+// CreateAutomation creates a new automation. companyID stamps tenant.
+func (c *Core) CreateAutomation(o models.Automation, companyID int) (models.Automation, error) {
 	uu, err := uuid.NewV4()
 	if err != nil {
 		return models.Automation{}, echo.NewHTTPError(http.StatusInternalServerError,
@@ -72,13 +74,13 @@ func (c *Core) CreateAutomation(o models.Automation) (models.Automation, error) 
 	}
 
 	var id int
-	if err := c.q.CreateAutomation.Get(&id, uu, o.Name, o.Description, o.Status, o.Canvas); err != nil {
+	if err := c.q.CreateAutomation.Get(&id, uu, o.Name, o.Description, o.Status, o.Canvas, companyID); err != nil {
 		c.log.Printf("error creating automation: %v", err)
 		return models.Automation{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "automation", "error", pqErrMsg(err)))
 	}
 
-	return c.GetAutomation(id, "")
+	return c.GetAutomation(id, "", 0)
 }
 
 // UpdateAutomation updates an automation.
@@ -98,7 +100,7 @@ func (c *Core) UpdateAutomation(id int, o models.Automation) (models.Automation,
 			c.i18n.Ts("globals.messages.notFound", "name", "automation"))
 	}
 
-	return c.GetAutomation(id, "")
+	return c.GetAutomation(id, "", 0)
 }
 
 // DeleteAutomation deletes an automation.

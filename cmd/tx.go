@@ -109,7 +109,8 @@ func (a *App) SendTxMessage(c echo.Context) error {
 			}
 
 			var err error
-			sub, err = a.core.GetSubscriber(subID, "", subEmail)
+			// TX (transactional) send context — caller already validated identity.
+			sub, err = a.core.GetSubscriber(subID, "", subEmail, 0)
 			if err != nil {
 				if er, ok := err.(*echo.HTTPError); ok && er.Code == http.StatusBadRequest {
 					// `fallback`: Create an ephemeral "subscriber" if the subscriber wasn't found.

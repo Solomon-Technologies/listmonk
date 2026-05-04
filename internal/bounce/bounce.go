@@ -35,6 +35,10 @@ type Opt struct {
 		Enabled bool
 		Key     string
 	}
+	Resend struct {
+		Enabled    bool
+		SigningKey string
+	}
 
 	RecordBounceCB func(models.Bounce) error
 }
@@ -47,6 +51,7 @@ type Manager struct {
 	Sendgrid     *webhooks.Sendgrid
 	Postmark     *webhooks.Postmark
 	Forwardemail *webhooks.Forwardemail
+	Resend       *webhooks.Resend
 	queries      *Queries
 	opt          Opt
 	log          *log.Logger
@@ -98,6 +103,13 @@ func New(opt Opt, q *Queries, lo *log.Logger) (*Manager, error) {
 		if opt.ForwardEmail.Enabled {
 			fe := webhooks.NewForwardemail([]byte(opt.ForwardEmail.Key))
 			m.Forwardemail = fe
+		}
+
+		// Resend webhook (Svix signature). Solomon fork — the Solomon stack
+		// uses Resend as primary email provider, so this handles delivery
+		// status callbacks for bounces and complaints.
+		if opt.Resend.Enabled {
+			m.Resend = webhooks.NewResend(opt.Resend.SigningKey)
 		}
 	}
 

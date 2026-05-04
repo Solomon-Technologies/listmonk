@@ -9,14 +9,15 @@ import (
 )
 
 // GetABTest retrieves an A/B test by ID or UUID.
-func (c *Core) GetABTest(id int, uuStr string) (models.ABTest, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetABTest(id int, uuStr string, companyID int) (models.ABTest, error) {
 	var uu any
 	if uuStr != "" {
 		uu = uuStr
 	}
 
 	var out models.ABTest
-	if err := c.q.GetABTest.Get(&out, id, uu); err != nil {
+	if err := c.q.GetABTest.Get(&out, id, uu, companyID); err != nil {
 		return out, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "A/B test", "error", pqErrMsg(err)))
 	}
@@ -45,17 +46,18 @@ func (c *Core) GetABTest(id int, uuStr string) (models.ABTest, error) {
 }
 
 // GetABTestByCampaign retrieves the A/B test for a campaign.
-func (c *Core) GetABTestByCampaign(campaignID int) (models.ABTest, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetABTestByCampaign(campaignID, companyID int) (models.ABTest, error) {
 	var out models.ABTest
-	if err := c.q.GetABTestByCampaign.Get(&out, campaignID); err != nil {
+	if err := c.q.GetABTestByCampaign.Get(&out, campaignID, companyID); err != nil {
 		return out, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "A/B test", "error", pqErrMsg(err)))
 	}
 	return out, nil
 }
 
-// CreateABTest creates a new A/B test.
-func (c *Core) CreateABTest(o models.ABTest) (models.ABTest, error) {
+// CreateABTest creates a new A/B test. companyID stamps tenant.
+func (c *Core) CreateABTest(o models.ABTest, companyID int) (models.ABTest, error) {
 	uu, err := uuid.NewV4()
 	if err != nil {
 		return models.ABTest{}, echo.NewHTTPError(http.StatusInternalServerError,
@@ -79,13 +81,13 @@ func (c *Core) CreateABTest(o models.ABTest) (models.ABTest, error) {
 	}
 
 	var id int
-	if err := c.q.CreateABTest.Get(&id, uu, o.CampaignID, o.TestType, o.Status, o.TestPercentage, o.WinnerMetric, o.WinnerWaitHours); err != nil {
+	if err := c.q.CreateABTest.Get(&id, uu, o.CampaignID, o.TestType, o.Status, o.TestPercentage, o.WinnerMetric, o.WinnerWaitHours, companyID); err != nil {
 		c.log.Printf("error creating A/B test: %v", err)
 		return models.ABTest{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "A/B test", "error", pqErrMsg(err)))
 	}
 
-	return c.GetABTest(id, "")
+	return c.GetABTest(id, "", 0)
 }
 
 // UpdateABTest updates an A/B test.
@@ -101,7 +103,7 @@ func (c *Core) UpdateABTest(id int, o models.ABTest) (models.ABTest, error) {
 			c.i18n.Ts("globals.messages.notFound", "name", "A/B test"))
 	}
 
-	return c.GetABTest(id, "")
+	return c.GetABTest(id, "", 0)
 }
 
 // UpdateABTestStatus updates the status of an A/B test.

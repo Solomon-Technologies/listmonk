@@ -1,10 +1,15 @@
 -- warming
 
 -- name: get-warming-addresses
-SELECT * FROM warming_addresses ORDER BY created_at DESC;
+-- $1 = company_id (v7.17.0); 0 disables filter, >0 scopes lookup.
+SELECT * FROM warming_addresses
+    WHERE ($1::INT = 0 OR company_id = $1::INT)
+    ORDER BY created_at DESC;
 
 -- name: create-warming-address
-INSERT INTO warming_addresses (email, name) VALUES($1, $2) RETURNING id;
+-- $3 = company_id (v7.17.0); 0 falls back to Solomon=1.
+INSERT INTO warming_addresses (email, name, company_id)
+    VALUES($1, $2, COALESCE(NULLIF($3::INT, 0), 1)) RETURNING id;
 
 -- name: update-warming-address
 UPDATE warming_addresses SET
@@ -18,11 +23,15 @@ DELETE FROM warming_addresses WHERE id = $1;
 SELECT * FROM warming_addresses WHERE is_active = true;
 
 -- name: get-warming-senders
-SELECT * FROM warming_senders ORDER BY created_at DESC;
+-- $1 = company_id (v7.17.0); 0 disables filter.
+SELECT * FROM warming_senders
+    WHERE ($1::INT = 0 OR company_id = $1::INT)
+    ORDER BY created_at DESC;
 
 -- name: create-warming-sender
-INSERT INTO warming_senders (email, name, brand, brand_url, brand_color)
-    VALUES($1, $2, $3, $4, $5) RETURNING id;
+-- $6 = company_id (v7.17.0); 0 falls back to Solomon=1.
+INSERT INTO warming_senders (email, name, brand, brand_url, brand_color, company_id)
+    VALUES($1, $2, $3, $4, $5, COALESCE(NULLIF($6::INT, 0), 1)) RETURNING id;
 
 -- name: update-warming-sender
 UPDATE warming_senders SET
@@ -37,10 +46,15 @@ DELETE FROM warming_senders WHERE id = $1;
 SELECT * FROM warming_senders WHERE is_active = true;
 
 -- name: get-warming-templates
-SELECT * FROM warming_templates ORDER BY created_at DESC;
+-- $1 = company_id (v7.17.0); 0 disables filter.
+SELECT * FROM warming_templates
+    WHERE ($1::INT = 0 OR company_id = $1::INT)
+    ORDER BY created_at DESC;
 
 -- name: create-warming-template
-INSERT INTO warming_templates (subject, body) VALUES($1, $2) RETURNING id;
+-- $3 = company_id (v7.17.0); 0 falls back to Solomon=1.
+INSERT INTO warming_templates (subject, body, company_id)
+    VALUES($1, $2, COALESCE(NULLIF($3::INT, 0), 1)) RETURNING id;
 
 -- name: update-warming-template
 UPDATE warming_templates SET
@@ -95,11 +109,15 @@ SELECT COUNT(*) FROM warming_send_log WHERE ($1 = 0 OR campaign_id = $1);
 -- Warming campaigns
 
 -- name: get-warming-campaigns
-SELECT * FROM warming_campaigns ORDER BY created_at DESC;
+-- $1 = company_id (v7.17.0); 0 disables filter.
+SELECT * FROM warming_campaigns
+    WHERE ($1::INT = 0 OR company_id = $1::INT)
+    ORDER BY created_at DESC;
 
 -- name: create-warming-campaign
-INSERT INTO warming_campaigns (name, brand, sender_domains, status, sends_per_run, runs_per_day, schedule_times, random_delay_min_s, random_delay_max_s, warmup_start_date, daily_limits, hourly_cap, business_hours_only, sender_id, messenger, recipient_ids)
-    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id;
+-- $17 = company_id (v7.17.0); 0 falls back to Solomon=1.
+INSERT INTO warming_campaigns (name, brand, sender_domains, status, sends_per_run, runs_per_day, schedule_times, random_delay_min_s, random_delay_max_s, warmup_start_date, daily_limits, hourly_cap, business_hours_only, sender_id, messenger, recipient_ids, company_id)
+    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, COALESCE(NULLIF($17::INT, 0), 1)) RETURNING id;
 
 -- name: update-warming-campaign
 UPDATE warming_campaigns SET

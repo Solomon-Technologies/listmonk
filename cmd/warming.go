@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/knadh/listmonk/internal/auth"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v4"
 	"github.com/lib/pq"
@@ -20,7 +21,7 @@ func parseDate(s string) time.Time {
 
 // GetWarmingAddresses returns all warming addresses.
 func (a *App) GetWarmingAddresses(c echo.Context) error {
-	out, err := a.core.GetWarmingAddresses()
+	out, err := a.core.GetWarmingAddresses(a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -40,7 +41,7 @@ func (a *App) CreateWarmingAddress(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "email is required")
 	}
 
-	id, err := a.core.CreateWarmingAddress(o.Email, o.Name)
+	id, err := a.core.CreateWarmingAddress(o.Email, o.Name, auth.GetUser(c).CompanyID)
 	if err != nil {
 		return err
 	}
@@ -76,7 +77,7 @@ func (a *App) DeleteWarmingAddress(c echo.Context) error {
 
 // GetWarmingSenders returns all warming senders.
 func (a *App) GetWarmingSenders(c echo.Context) error {
-	out, err := a.core.GetWarmingSenders()
+	out, err := a.core.GetWarmingSenders(a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -102,7 +103,7 @@ func (a *App) CreateWarmingSender(c echo.Context) error {
 		o.BrandColor = "#F2C94C"
 	}
 
-	id, err := a.core.CreateWarmingSender(o.Email, o.Name, o.Brand, o.BrandURL, o.BrandColor)
+	id, err := a.core.CreateWarmingSender(o.Email, o.Name, o.Brand, o.BrandURL, o.BrandColor, auth.GetUser(c).CompanyID)
 	if err != nil {
 		return err
 	}
@@ -141,7 +142,7 @@ func (a *App) DeleteWarmingSender(c echo.Context) error {
 
 // GetWarmingTemplates returns all warming templates.
 func (a *App) GetWarmingTemplates(c echo.Context) error {
-	out, err := a.core.GetWarmingTemplates()
+	out, err := a.core.GetWarmingTemplates(a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -161,7 +162,7 @@ func (a *App) CreateWarmingTemplate(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "subject and body are required")
 	}
 
-	id, err := a.core.CreateWarmingTemplate(o.Subject, o.Body)
+	id, err := a.core.CreateWarmingTemplate(o.Subject, o.Body, auth.GetUser(c).CompanyID)
 	if err != nil {
 		return err
 	}
@@ -257,7 +258,7 @@ func (a *App) GetWarmingStats(c echo.Context) error {
 
 // GetWarmingCampaigns returns all warming campaigns.
 func (a *App) GetWarmingCampaigns(c echo.Context) error {
-	out, err := a.core.GetWarmingCampaigns()
+	out, err := a.core.GetWarmingCampaigns(a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -339,7 +340,7 @@ func (a *App) CreateWarmingCampaign(c echo.Context) error {
 		SenderID:          senderID,
 		Messenger:         o.Messenger,
 		RecipientIDs:      pq.Int64Array(o.RecipientIDs),
-	})
+	}, auth.GetUser(c).CompanyID)
 	if err != nil {
 		return err
 	}

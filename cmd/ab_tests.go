@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/knadh/listmonk/internal/auth"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v4"
 )
@@ -12,7 +13,7 @@ import (
 func (a *App) GetABTest(c echo.Context) error {
 	id := getID(c)
 
-	out, err := a.core.GetABTest(id, "")
+	out, err := a.core.GetABTest(id, "", a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -24,7 +25,7 @@ func (a *App) GetABTest(c echo.Context) error {
 func (a *App) GetABTestByCampaign(c echo.Context) error {
 	id := getID(c)
 
-	out, err := a.core.GetABTestByCampaign(id)
+	out, err := a.core.GetABTestByCampaign(id, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -60,7 +61,8 @@ func (a *App) CreateABTest(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid test_type: "+o.TestType)
 	}
 
-	out, err := a.core.CreateABTest(o)
+	user := auth.GetUser(c)
+	out, err := a.core.CreateABTest(o, user.CompanyID)
 	if err != nil {
 		return err
 	}

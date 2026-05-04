@@ -14,11 +14,12 @@ import (
 var dripQuerySortFields = []string{"name", "status", "created_at", "updated_at"}
 
 // QueryDripCampaigns retrieves paginated drip campaigns.
-func (c *Core) QueryDripCampaigns(searchStr, orderBy, order string, offset, limit int) (models.DripCampaigns, int, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) QueryDripCampaigns(searchStr, orderBy, order string, offset, limit, companyID int) (models.DripCampaigns, int, error) {
 	queryStr, stmt := makeSearchQuery(searchStr, orderBy, order, c.q.QueryDripCampaigns, dripQuerySortFields)
 
 	var out models.DripCampaigns
-	if err := c.db.Select(&out, stmt, 0, nil, queryStr, offset, limit); err != nil {
+	if err := c.db.Select(&out, stmt, 0, nil, queryStr, offset, limit, companyID); err != nil {
 		c.log.Printf("error fetching drip campaigns: %v", err)
 		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "drip campaigns", "error", pqErrMsg(err)))
@@ -33,14 +34,15 @@ func (c *Core) QueryDripCampaigns(searchStr, orderBy, order string, offset, limi
 }
 
 // GetDripCampaign retrieves a drip campaign by ID or UUID.
-func (c *Core) GetDripCampaign(id int, uuid string) (models.DripCampaign, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetDripCampaign(id int, uuid string, companyID int) (models.DripCampaign, error) {
 	var uu any
 	if uuid != "" {
 		uu = uuid
 	}
 
 	var out models.DripCampaign
-	if err := c.q.GetDripCampaign.Get(&out, id, uu); err != nil {
+	if err := c.q.GetDripCampaign.Get(&out, id, uu, companyID); err != nil {
 		return out, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "drip campaign", "error", pqErrMsg(err)))
 	}
@@ -60,8 +62,8 @@ func (c *Core) GetDripCampaign(id int, uuid string) (models.DripCampaign, error)
 	return out, nil
 }
 
-// CreateDripCampaign creates a new drip campaign.
-func (c *Core) CreateDripCampaign(o models.DripCampaign) (models.DripCampaign, error) {
+// CreateDripCampaign creates a new drip campaign. companyID stamps tenant.
+func (c *Core) CreateDripCampaign(o models.DripCampaign, companyID int) (models.DripCampaign, error) {
 	uu, err := uuid.NewV4()
 	if err != nil {
 		c.log.Printf("error generating UUID: %v", err)
@@ -80,13 +82,13 @@ func (c *Core) CreateDripCampaign(o models.DripCampaign) (models.DripCampaign, e
 	}
 
 	var id int
-	if err := c.q.CreateDripCampaign.Get(&id, uu, o.Name, o.Description, o.Status, o.TriggerType, o.TriggerConfig, o.SegmentID, o.FromEmail); err != nil {
+	if err := c.q.CreateDripCampaign.Get(&id, uu, o.Name, o.Description, o.Status, o.TriggerType, o.TriggerConfig, o.SegmentID, o.FromEmail, companyID); err != nil {
 		c.log.Printf("error creating drip campaign: %v", err)
 		return models.DripCampaign{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "drip campaign", "error", pqErrMsg(err)))
 	}
 
-	return c.GetDripCampaign(id, "")
+	return c.GetDripCampaign(id, "", 0)
 }
 
 // UpdateDripCampaign updates a drip campaign.
@@ -106,7 +108,7 @@ func (c *Core) UpdateDripCampaign(id int, o models.DripCampaign) (models.DripCam
 			c.i18n.Ts("globals.messages.notFound", "name", "drip campaign"))
 	}
 
-	return c.GetDripCampaign(id, "")
+	return c.GetDripCampaign(id, "", 0)
 }
 
 // UpdateDripCampaignStatus updates just the status of a drip campaign.

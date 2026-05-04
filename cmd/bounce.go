@@ -15,7 +15,7 @@ import (
 func (a *App) GetBounce(c echo.Context) error {
 	// Fetch one bounce from the DB.
 	id := getID(c)
-	out, err := a.core.GetBounce(id)
+	out, err := a.core.GetBounce(id, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -35,7 +35,7 @@ func (a *App) GetBounces(c echo.Context) error {
 	)
 
 	// Query and fetch bounces from the DB.
-	res, total, err := a.core.QueryBounces(campID, 0, source, orderBy, order, pg.Offset, pg.Limit)
+	res, total, err := a.core.QueryBounces(campID, 0, source, orderBy, order, pg.Offset, pg.Limit, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func (a *App) GetBounces(c echo.Context) error {
 func (a *App) GetSubscriberBounces(c echo.Context) error {
 	// Query and fetch bounces from the DB.
 	subID := getID(c)
-	out, _, err := a.core.QueryBounces(0, subID, "", "", "", 0, 1000)
+	out, _, err := a.core.QueryBounces(0, subID, "", "", "", 0, 1000, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -216,6 +216,21 @@ func (a *App) BounceWebhook(c echo.Context) error {
 				return err
 			}
 
+			return echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("globals.messages.invalidData"))
+		}
+		bounces = append(bounces, bs...)
+
+	// Resend (Solomon fork). Uses Svix-style signed webhooks.
+	case service == "resend" && a.cfg.BounceResendEnabled:
+		var (
+			svixID  = c.Request().Header.Get("svix-id")
+			svixTS  = c.Request().Header.Get("svix-timestamp")
+			svixSig = c.Request().Header.Get("svix-signature")
+		)
+
+		bs, err := a.bounce.Resend.ProcessBounce(svixID, svixTS, svixSig, rawReq)
+		if err != nil {
+			a.log.Printf("error processing resend notification: %v", err)
 			return echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("globals.messages.invalidData"))
 		}
 		bounces = append(bounces, bs...)

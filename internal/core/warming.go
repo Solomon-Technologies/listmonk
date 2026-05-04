@@ -10,9 +10,10 @@ import (
 )
 
 // GetWarmingAddresses returns all warming addresses.
-func (c *Core) GetWarmingAddresses() ([]models.WarmingAddress, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetWarmingAddresses(companyID int) ([]models.WarmingAddress, error) {
 	var out []models.WarmingAddress
-	if err := c.q.GetWarmingAddresses.Select(&out); err != nil {
+	if err := c.q.GetWarmingAddresses.Select(&out, companyID); err != nil {
 		c.log.Printf("error fetching warming addresses: %v", err)
 		return nil, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "warming addresses", "error", pqErrMsg(err)))
@@ -20,10 +21,10 @@ func (c *Core) GetWarmingAddresses() ([]models.WarmingAddress, error) {
 	return out, nil
 }
 
-// CreateWarmingAddress creates a new warming address.
-func (c *Core) CreateWarmingAddress(email, name string) (int, error) {
+// CreateWarmingAddress creates a new warming address. companyID stamps tenant.
+func (c *Core) CreateWarmingAddress(email, name string, companyID int) (int, error) {
 	var id int
-	if err := c.q.CreateWarmingAddress.Get(&id, email, name); err != nil {
+	if err := c.q.CreateWarmingAddress.Get(&id, email, name, companyID); err != nil {
 		c.log.Printf("error creating warming address: %v", err)
 		return 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "warming address", "error", pqErrMsg(err)))
@@ -63,9 +64,10 @@ func (c *Core) GetActiveWarmingAddresses() ([]models.WarmingAddress, error) {
 }
 
 // GetWarmingSenders returns all warming senders.
-func (c *Core) GetWarmingSenders() ([]models.WarmingSender, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetWarmingSenders(companyID int) ([]models.WarmingSender, error) {
 	var out []models.WarmingSender
-	if err := c.q.GetWarmingSenders.Select(&out); err != nil {
+	if err := c.q.GetWarmingSenders.Select(&out, companyID); err != nil {
 		c.log.Printf("error fetching warming senders: %v", err)
 		return nil, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "warming senders", "error", pqErrMsg(err)))
@@ -74,9 +76,9 @@ func (c *Core) GetWarmingSenders() ([]models.WarmingSender, error) {
 }
 
 // CreateWarmingSender creates a new warming sender.
-func (c *Core) CreateWarmingSender(email, name, brand, brandURL, brandColor string) (int, error) {
+func (c *Core) CreateWarmingSender(email, name, brand, brandURL, brandColor string, companyID int) (int, error) {
 	var id int
-	if err := c.q.CreateWarmingSender.Get(&id, email, name, brand, brandURL, brandColor); err != nil {
+	if err := c.q.CreateWarmingSender.Get(&id, email, name, brand, brandURL, brandColor, companyID); err != nil {
 		c.log.Printf("error creating warming sender: %v", err)
 		return 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "warming sender", "error", pqErrMsg(err)))
@@ -116,9 +118,10 @@ func (c *Core) GetActiveWarmingSenders() ([]models.WarmingSender, error) {
 }
 
 // GetWarmingTemplates returns all warming templates.
-func (c *Core) GetWarmingTemplates() ([]models.WarmingTemplate, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetWarmingTemplates(companyID int) ([]models.WarmingTemplate, error) {
 	var out []models.WarmingTemplate
-	if err := c.q.GetWarmingTemplates.Select(&out); err != nil {
+	if err := c.q.GetWarmingTemplates.Select(&out, companyID); err != nil {
 		c.log.Printf("error fetching warming templates: %v", err)
 		return nil, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "warming templates", "error", pqErrMsg(err)))
@@ -127,9 +130,9 @@ func (c *Core) GetWarmingTemplates() ([]models.WarmingTemplate, error) {
 }
 
 // CreateWarmingTemplate creates a new warming template.
-func (c *Core) CreateWarmingTemplate(subject, body string) (int, error) {
+func (c *Core) CreateWarmingTemplate(subject, body string, companyID int) (int, error) {
 	var id int
-	if err := c.q.CreateWarmingTemplate.Get(&id, subject, body); err != nil {
+	if err := c.q.CreateWarmingTemplate.Get(&id, subject, body, companyID); err != nil {
 		c.log.Printf("error creating warming template: %v", err)
 		return 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "warming template", "error", pqErrMsg(err)))
@@ -216,9 +219,10 @@ func (c *Core) RecordWarmingSendCampaign(campaignID int, senderEmail, recipientE
 }
 
 // GetWarmingCampaigns returns all warming campaigns.
-func (c *Core) GetWarmingCampaigns() ([]models.WarmingCampaign, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetWarmingCampaigns(companyID int) ([]models.WarmingCampaign, error) {
 	var out []models.WarmingCampaign
-	if err := c.q.GetWarmingCampaigns.Select(&out); err != nil {
+	if err := c.q.GetWarmingCampaigns.Select(&out, companyID); err != nil {
 		c.log.Printf("error fetching warming campaigns: %v", err)
 		return nil, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "warming campaigns", "error", pqErrMsg(err)))
@@ -226,8 +230,8 @@ func (c *Core) GetWarmingCampaigns() ([]models.WarmingCampaign, error) {
 	return out, nil
 }
 
-// CreateWarmingCampaign creates a new warming campaign.
-func (c *Core) CreateWarmingCampaign(o models.WarmingCampaign) (int, error) {
+// CreateWarmingCampaign creates a new warming campaign. companyID stamps tenant.
+func (c *Core) CreateWarmingCampaign(o models.WarmingCampaign, companyID int) (int, error) {
 	var id int
 	if o.RecipientIDs == nil {
 		o.RecipientIDs = pq.Int64Array{}
@@ -236,7 +240,7 @@ func (c *Core) CreateWarmingCampaign(o models.WarmingCampaign) (int, error) {
 		o.Name, o.Brand, o.SenderDomains, o.Status,
 		o.SendsPerRun, o.RunsPerDay, o.ScheduleTimes,
 		o.RandomDelayMin, o.RandomDelayMax,
-		o.WarmupStartDate, o.DailyLimits, o.HourlyCap, o.BusinessHoursOnly, o.SenderID, o.Messenger, o.RecipientIDs); err != nil {
+		o.WarmupStartDate, o.DailyLimits, o.HourlyCap, o.BusinessHoursOnly, o.SenderID, o.Messenger, o.RecipientIDs, companyID); err != nil {
 		c.log.Printf("error creating warming campaign: %v", err)
 		return 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "warming campaign", "error", pqErrMsg(err)))

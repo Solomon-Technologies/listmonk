@@ -52,6 +52,8 @@ WHERE ($1 = 0 OR bounces.id = $1)
     AND ($2 = 0 OR bounces.campaign_id = $2)
     AND ($3 = 0 OR bounces.subscriber_id = $3)
     AND ($4 = '' OR bounces.source = $4)
+    -- Multi-tenant filter (v7.17.0): $7=0 disables, else scope to company.
+    AND ($7::INT = 0 OR bounces.company_id = $7::INT)
 ORDER BY %order% OFFSET $5 LIMIT (CASE WHEN $6 < 1 THEN NULL ELSE $6 END);
 
 -- name: delete-bounces

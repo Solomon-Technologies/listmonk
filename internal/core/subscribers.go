@@ -31,14 +31,16 @@ var (
 )
 
 // GetSubscriber fetches a subscriber by one of the given params.
-func (c *Core) GetSubscriber(id int, uuid, email string) (models.Subscriber, error) {
+// companyID=0 disables tenant filtering (used for public unsubscribe/optin
+// pages where the UUID is itself authentication); >0 scopes the lookup.
+func (c *Core) GetSubscriber(id int, uuid, email string, companyID int) (models.Subscriber, error) {
 	var uu any
 	if uuid != "" {
 		uu = uuid
 	}
 
 	var out models.Subscribers
-	if err := c.q.GetSubscriber.Select(&out, id, uu, email); err != nil {
+	if err := c.q.GetSubscriber.Select(&out, id, uu, email, companyID); err != nil {
 		c.log.Printf("error fetching subscriber: %v", err)
 		return models.Subscriber{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching",
@@ -103,7 +105,8 @@ func (c *Core) GetSubscribersByEmail(emails []string) (models.Subscribers, error
 }
 
 // QuerySubscribers queries and returns paginated subscrribers based on the given params including the total count.
-func (c *Core) QuerySubscribers(searchStr, queryExp string, listIDs []int, subStatus string, order, orderBy string, offset, limit int) (models.Subscribers, int, error) {
+// companyID=0 disables tenant filtering; >0 scopes results.
+func (c *Core) QuerySubscribers(searchStr, queryExp string, listIDs []int, subStatus string, order, orderBy string, offset, limit, companyID int) (models.Subscribers, int, error) {
 	// Sort params.
 	if !strSliceContains(orderBy, subQuerySortFields) {
 		orderBy = "subscribers.id"
@@ -136,7 +139,7 @@ func (c *Core) QuerySubscribers(searchStr, queryExp string, listIDs []int, subSt
 
 	// Create a readonly transaction that just does COUNT() to obtain the count of results
 	// and to ensure that the arbitrary query is indeed readonly.
-	total, err := c.getSubscriberCount(searchStr, cond, subStatus, listIDs)
+	total, err := c.getSubscriberCount(searchStr, cond, subStatus, listIDs, companyID)
 	if err != nil {
 		c.log.Printf("error getting subscriber count: %v", err)
 		return nil, 0, err
@@ -155,7 +158,7 @@ func (c *Core) QuerySubscribers(searchStr, queryExp string, listIDs []int, subSt
 	defer tx.Rollback()
 
 	var out models.Subscribers
-	if err := tx.Select(&out, stmt, pq.Array(listIDs), subStatus, searchStr, offset, limit); err != nil {
+	if err := tx.Select(&out, stmt, pq.Array(listIDs), subStatus, searchStr, offset, limit, companyID); err != nil {
 		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.subscribers}", "error", pqErrMsg(err)))
 	}
@@ -249,8 +252,9 @@ func (c *Core) ExportSubscribers(searchStr, query string, subIDs, listIDs []int,
 	stmt := strings.ReplaceAll(c.q.QuerySubscribersForExport, "%query%", cond)
 
 	// Create a readonly transaction that just does COUNT() to obtain the count of results
-	// and to ensure that the arbitrary query is indeed readonly.
-	if _, err := c.getSubscriberCount(searchStr, cond, subStatus, listIDs); err != nil {
+	// and to ensure that the arbitrary query is indeed readonly. Export is admin-only,
+	// no tenant filter needed at the count step.
+	if _, err := c.getSubscriberCount(searchStr, cond, subStatus, listIDs, 0); err != nil {
 		c.log.Printf("error getting subscriber count: %v", err)
 		return nil, err
 	}
@@ -329,7 +333,7 @@ func (c *Core) InsertSubscriber(sub models.Subscriber, listIDs []int, listUUIDs 
 
 	// Fetch the subscriber's full data. If the subscriber already existed and wasn't
 	// created, the id will be empty. Fetch the details by e-mail then.
-	out, err := c.GetSubscriber(sub.ID, "", sub.Email)
+	out, err := c.GetSubscriber(sub.ID, "", sub.Email, 0)
 	if err != nil {
 		return models.Subscriber{}, false, err
 	}
@@ -379,7 +383,7 @@ func (c *Core) UpdateSubscriber(id int, sub models.Subscriber) (models.Subscribe
 			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.subscriber}", "error", pqErrMsg(err)))
 	}
 
-	out, err := c.GetSubscriber(sub.ID, "", sub.Email)
+	out, err := c.GetSubscriber(sub.ID, "", sub.Email, 0)
 	if err != nil {
 		return models.Subscriber{}, err
 	}
@@ -424,7 +428,7 @@ func (c *Core) UpdateSubscriberWithLists(id int, sub models.Subscriber, listIDs 
 			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.subscriber}", "error", pqErrMsg(err)))
 	}
 
-	out, err := c.GetSubscriber(sub.ID, "", sub.Email)
+	out, err := c.GetSubscriber(sub.ID, "", sub.Email, 0)
 	if err != nil {
 		return models.Subscriber{}, false, err
 	}
@@ -567,9 +571,11 @@ func (c *Core) DeleteBlocklistedSubscribers() (int, error) {
 	return int(n), nil
 }
 
-func (c *Core) getSubscriberCount(searchStr, queryExp, subStatus string, listIDs []int) (int, error) {
+func (c *Core) getSubscriberCount(searchStr, queryExp, subStatus string, listIDs []int, companyID int) (int, error) {
 	// If there's no condition, it's a "get all" call which can probably be optionally pulled from cache.
-	if queryExp == "" {
+	// (mat_list_subscriber_stats is a global aggregate; for company-scoped counts we fall through to the
+	// SELECT COUNT() path below to avoid stale per-tenant data.)
+	if queryExp == "" && companyID == 0 {
 		_ = c.refreshCache(matListSubStats, false)
 
 		total := 0
@@ -581,9 +587,15 @@ func (c *Core) getSubscriberCount(searchStr, queryExp, subStatus string, listIDs
 		return total, nil
 	}
 
+	// Default to TRUE when no arbitrary query was passed but companyID > 0.
+	cond := queryExp
+	if cond == "" {
+		cond = "TRUE"
+	}
+
 	// Create a readonly transaction that just does COUNT() to obtain the count of results
 	// and to ensure that the arbitrary query is indeed readonly.
-	stmt := strings.ReplaceAll(c.q.QuerySubscribersCount, "%query%", queryExp)
+	stmt := strings.ReplaceAll(c.q.QuerySubscribersCount, "%query%", cond)
 	tx, err := c.db.BeginTxx(context.Background(), &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		c.log.Printf("error preparing subscriber query: %v", err)
@@ -593,7 +605,7 @@ func (c *Core) getSubscriberCount(searchStr, queryExp, subStatus string, listIDs
 
 	// Execute the readonly query and get the count of results.
 	total := 0
-	if err := tx.Get(&total, stmt, pq.Array(listIDs), subStatus, searchStr); err != nil {
+	if err := tx.Get(&total, stmt, pq.Array(listIDs), subStatus, searchStr, companyID); err != nil {
 		return 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.subscribers}", "error", pqErrMsg(err)))
 	}
@@ -611,7 +623,10 @@ func validateQueryTables(db *sqlx.DB, query string, allowedTables map[string]str
 	defer tx.Rollback()
 
 	var plan string
-	if err = tx.QueryRow("EXPLAIN (FORMAT JSON) "+query, nil, models.SubscriberStatusEnabled, "", 0, 10).Scan(&plan); err != nil {
+	// Sample params for EXPLAIN dry-run. Last arg (0) is companyID added in
+	// v7.17.0 — it disables the multi-tenant filter for this validation call
+	// since we're only checking which tables the query touches.
+	if err = tx.QueryRow("EXPLAIN (FORMAT JSON) "+query, nil, models.SubscriberStatusEnabled, "", 0, 10, 0).Scan(&plan); err != nil {
 		return err
 	}
 

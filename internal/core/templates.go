@@ -10,9 +10,10 @@ import (
 )
 
 // GetTemplates retrieves all templates.
-func (c *Core) GetTemplates(status string, noBody bool) ([]models.Template, error) {
+// companyID=0 disables tenant filtering; >0 scopes results.
+func (c *Core) GetTemplates(status string, noBody bool, companyID int) ([]models.Template, error) {
 	out := []models.Template{}
-	if err := c.q.GetTemplates.Select(&out, 0, noBody, status); err != nil {
+	if err := c.q.GetTemplates.Select(&out, 0, noBody, status, companyID); err != nil {
 		return nil, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.templates}", "error", pqErrMsg(err)))
 	}
@@ -21,9 +22,11 @@ func (c *Core) GetTemplates(status string, noBody bool) ([]models.Template, erro
 }
 
 // GetTemplate retrieves a given template.
-func (c *Core) GetTemplate(id int, noBody bool) (models.Template, error) {
+// companyID=0 disables tenant filtering (used for internal flows like
+// campaign template merge); >0 scopes the lookup.
+func (c *Core) GetTemplate(id int, noBody bool, companyID int) (models.Template, error) {
 	var out []models.Template
-	if err := c.q.GetTemplates.Select(&out, id, noBody, ""); err != nil {
+	if err := c.q.GetTemplates.Select(&out, id, noBody, "", companyID); err != nil {
 		return models.Template{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.templates}", "error", pqErrMsg(err)))
 	}
@@ -37,14 +40,15 @@ func (c *Core) GetTemplate(id int, noBody bool) (models.Template, error) {
 }
 
 // CreateTemplate creates a new template.
-func (c *Core) CreateTemplate(name, typ, subject string, body []byte, bodySource null.String) (models.Template, error) {
+// companyID stamps the template's tenant; 0 falls back to Solomon=1 in SQL.
+func (c *Core) CreateTemplate(name, typ, subject string, body []byte, bodySource null.String, companyID int) (models.Template, error) {
 	var newID int
-	if err := c.q.CreateTemplate.Get(&newID, name, typ, subject, body, bodySource); err != nil {
+	if err := c.q.CreateTemplate.Get(&newID, name, typ, subject, body, bodySource, companyID); err != nil {
 		return models.Template{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.template}", "error", pqErrMsg(err)))
 	}
 
-	return c.GetTemplate(newID, false)
+	return c.GetTemplate(newID, false, 0)
 }
 
 // UpdateTemplate updates a given template.
@@ -60,7 +64,7 @@ func (c *Core) UpdateTemplate(id int, name, subject string, body []byte, bodySou
 			c.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.template}"))
 	}
 
-	return c.GetTemplate(id, false)
+	return c.GetTemplate(id, false, 0)
 }
 
 // SetDefaultTemplate sets a template as default.

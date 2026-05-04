@@ -1,14 +1,19 @@
 -- contact scoring
 
 -- name: create-scoring-rule
-INSERT INTO scoring_rules (name, enabled, event_type, score_value, conditions)
-    VALUES($1, $2, $3, $4, $5) RETURNING id;
+-- $6 = company_id (v7.17.0); 0 falls back to Solomon=1.
+INSERT INTO scoring_rules (name, enabled, event_type, score_value, conditions, company_id)
+    VALUES($1, $2, $3, $4, $5, COALESCE(NULLIF($6::INT, 0), 1)) RETURNING id;
 
 -- name: get-scoring-rules
-SELECT * FROM scoring_rules ORDER BY event_type, name;
+-- $1 = company_id (v7.17.0); 0 disables filter.
+SELECT * FROM scoring_rules
+    WHERE ($1::INT = 0 OR company_id = $1::INT)
+    ORDER BY event_type, name;
 
 -- name: get-scoring-rule
-SELECT * FROM scoring_rules WHERE id = $1;
+SELECT * FROM scoring_rules WHERE id = $1
+    AND ($2::INT = 0 OR company_id = $2::INT);
 
 -- name: get-scoring-rules-by-event
 SELECT * FROM scoring_rules WHERE enabled = true AND event_type = $1;

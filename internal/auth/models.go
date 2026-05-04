@@ -105,6 +105,15 @@ type User struct {
 	UserRolePerms pq.StringArray   `db:"user_role_permissions" json:"-"`
 	ListsPermsRaw *json.RawMessage `db:"list_role_perms" json:"-"`
 
+	// Multi-tenant company scoping (added in v7.17.0).
+	// CompanyID is the tenant this user belongs to. Every tenant-scoped
+	// query MUST filter by this value when app.enforce_company_isolation
+	// is true. The legacy SuperAdminRoleID=1 short-circuit in HasPerm() is
+	// orthogonal — it grants permission to perform an operation but does
+	// NOT bypass company filtering.
+	CompanyID   int    `db:"company_id" json:"company_id"`
+	CompanyName string `db:"company_name" json:"company_name,omitempty"`
+
 	// Non-DB fields filled post-retrieval.
 	UserRole struct {
 		ID          int      `db:"-" json:"id"`
@@ -139,10 +148,11 @@ type Role struct {
 	Name        null.String    `db:"name" json:"name"`
 	Permissions pq.StringArray `db:"permissions" json:"permissions"`
 
-	ListID   null.Int         `db:"list_id" json:"-"`
-	ParentID null.Int         `db:"parent_id" json:"-"`
-	ListsRaw json.RawMessage  `db:"list_permissions" json:"-"`
-	Lists    []ListPermission `db:"-" json:"lists"`
+	ListID    null.Int         `db:"list_id" json:"-"`
+	ParentID  null.Int         `db:"parent_id" json:"-"`
+	ListsRaw  json.RawMessage  `db:"list_permissions" json:"-"`
+	Lists     []ListPermission `db:"-" json:"lists"`
+	CompanyID int              `db:"company_id" json:"company_id"`
 }
 
 type ListRole struct {
@@ -150,10 +160,11 @@ type ListRole struct {
 
 	Name null.String `db:"name" json:"name"`
 
-	ListID   null.Int         `db:"list_id" json:"-"`
-	ParentID null.Int         `db:"parent_id" json:"-"`
-	ListsRaw json.RawMessage  `db:"list_permissions" json:"-"`
-	Lists    []ListPermission `db:"-" json:"lists"`
+	ListID    null.Int         `db:"list_id" json:"-"`
+	ParentID  null.Int         `db:"parent_id" json:"-"`
+	ListsRaw  json.RawMessage  `db:"list_permissions" json:"-"`
+	Lists     []ListPermission `db:"-" json:"lists"`
+	CompanyID int              `db:"company_id" json:"company_id"`
 }
 
 // HasPerm checks if the user has a specific permission.

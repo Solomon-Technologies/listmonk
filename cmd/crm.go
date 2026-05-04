@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/knadh/listmonk/internal/auth"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v4"
 )
@@ -14,7 +15,7 @@ func (a *App) GetDeals(c echo.Context) error {
 	subscriberID, _ := strconv.Atoi(c.FormValue("subscriber_id"))
 	status := c.FormValue("status")
 
-	out, total, err := a.core.QueryDeals(subscriberID, status, pg.Offset, pg.Limit)
+	out, total, err := a.core.QueryDeals(subscriberID, status, pg.Offset, pg.Limit, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -31,7 +32,7 @@ func (a *App) GetDeals(c echo.Context) error {
 func (a *App) GetDeal(c echo.Context) error {
 	id := getID(c)
 
-	out, err := a.core.GetDeal(id, "")
+	out, err := a.core.GetDeal(id, "", a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -50,7 +51,8 @@ func (a *App) CreateDeal(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "name and subscriber_id are required")
 	}
 
-	out, err := a.core.CreateDeal(o)
+	user := auth.GetUser(c)
+	out, err := a.core.CreateDeal(o, user.CompanyID)
 	if err != nil {
 		return err
 	}

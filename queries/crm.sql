@@ -1,8 +1,9 @@
 -- crm deals and activities
 
 -- name: create-deal
-INSERT INTO deals (uuid, subscriber_id, name, value, currency, status, stage, expected_close, notes, attribs)
-    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id;
+-- $11 = company_id (v7.17.0); 0 falls back to Solomon=1.
+INSERT INTO deals (uuid, subscriber_id, name, value, currency, status, stage, expected_close, notes, attribs, company_id)
+    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, COALESCE(NULLIF($11::INT, 0), 1)) RETURNING id;
 
 -- name: query-deals
 SELECT COUNT(*) OVER () AS total, deals.* FROM deals WHERE
@@ -11,12 +12,15 @@ SELECT COUNT(*) OVER () AS total, deals.* FROM deals WHERE
         ELSE TRUE
     END
     AND (CASE WHEN $2 != '' THEN status = $2 ELSE TRUE END)
+    -- Multi-tenant filter (v7.17.0): $5=0 disables.
+    AND ($5::INT = 0 OR company_id = $5::INT)
     ORDER BY created_at DESC
     OFFSET $3 LIMIT (CASE WHEN $4 < 1 THEN NULL ELSE $4 END);
 
 -- name: get-deal
 SELECT * FROM deals WHERE
-    CASE WHEN $1 > 0 THEN id = $1 ELSE uuid = $2::UUID END;
+    CASE WHEN $1 > 0 THEN id = $1 ELSE uuid = $2::UUID END
+    AND ($3::INT = 0 OR company_id = $3::INT);
 
 -- name: update-deal
 UPDATE deals SET

@@ -13,7 +13,8 @@ var bounceQuerySortFields = []string{"email", "campaign_name", "source", "create
 
 // QueryBounces retrieves paginated bounce entries based on the given params.
 // It also returns the total number of bounce records in the DB.
-func (c *Core) QueryBounces(campID, subID int, source, orderBy, order string, offset, limit int) ([]models.Bounce, int, error) {
+// companyID=0 disables tenant filtering; >0 scopes results.
+func (c *Core) QueryBounces(campID, subID int, source, orderBy, order string, offset, limit, companyID int) ([]models.Bounce, int, error) {
 	if !strSliceContains(orderBy, bounceQuerySortFields) {
 		orderBy = "created_at"
 	}
@@ -23,7 +24,7 @@ func (c *Core) QueryBounces(campID, subID int, source, orderBy, order string, of
 
 	out := []models.Bounce{}
 	stmt := strings.ReplaceAll(c.q.QueryBounces, "%order%", orderBy+" "+order)
-	if err := c.db.Select(&out, stmt, 0, campID, subID, source, offset, limit); err != nil {
+	if err := c.db.Select(&out, stmt, 0, campID, subID, source, offset, limit, companyID); err != nil {
 		c.log.Printf("error fetching bounces: %v", err)
 		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.bounce}", "error", pqErrMsg(err)))
@@ -38,10 +39,11 @@ func (c *Core) QueryBounces(campID, subID int, source, orderBy, order string, of
 }
 
 // GetBounce retrieves bounce entries based on the given params.
-func (c *Core) GetBounce(id int) (models.Bounce, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetBounce(id, companyID int) (models.Bounce, error) {
 	var out []models.Bounce
 	stmt := strings.ReplaceAll(c.q.QueryBounces, "%order%", "id "+SortAsc)
-	if err := c.db.Select(&out, stmt, id, 0, 0, "", 0, 1); err != nil {
+	if err := c.db.Select(&out, stmt, id, 0, 0, "", 0, 1, companyID); err != nil {
 		c.log.Printf("error fetching bounces: %v", err)
 		return models.Bounce{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.bounce}", "error", pqErrMsg(err)))

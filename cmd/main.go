@@ -31,7 +31,30 @@ import (
 	"github.com/knadh/listmonk/models"
 	"github.com/knadh/paginator"
 	"github.com/knadh/stuffbin"
+	"github.com/labstack/echo/v4"
 )
+
+// tenantFilter returns the company_id to scope tenant-aware queries by.
+//
+// Multi-tenant isolation (v7.17.0+):
+//   - When app.enforce_company_isolation is false (default), returns 0
+//     which signals "no filter" — every tenant-scoped query has an
+//     `AND ($N = 0 OR company_id = $N)` clause that short-circuits to
+//     true when the param is 0. This is dual-mode: schema is in place
+//     but behaves identically to pre-v7.17.0.
+//   - When true, returns the authenticated user's CompanyID, scoping
+//     reads to that tenant and stamping creates with it.
+//
+// Internal flows (campaign send, drip processor, warming processor,
+// public unsubscribe/optin pages) call core methods with companyID=0
+// directly — they're trusted and operate on records they fetched.
+func (a *App) tenantFilter(c echo.Context) int {
+	if !ko.Bool("app.enforce_company_isolation") {
+		return 0
+	}
+	user := auth.GetUser(c)
+	return user.CompanyID
+}
 
 // App contains the "global" shared components, controllers and fields.
 type App struct {

@@ -14,7 +14,8 @@ import (
 var segmentQuerySortFields = []string{"name", "created_at", "updated_at", "subscriber_count"}
 
 // QuerySegments retrieves paginated segments optionally filtering by search.
-func (c *Core) QuerySegments(searchStr string, tags []string, orderBy, order string, offset, limit int) (models.Segments, int, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) QuerySegments(searchStr string, tags []string, orderBy, order string, offset, limit, companyID int) (models.Segments, int, error) {
 	queryStr, stmt := makeSearchQuery(searchStr, orderBy, order, c.q.QuerySegments, segmentQuerySortFields)
 
 	if tags == nil {
@@ -22,7 +23,7 @@ func (c *Core) QuerySegments(searchStr string, tags []string, orderBy, order str
 	}
 
 	var out models.Segments
-	if err := c.db.Select(&out, stmt, 0, nil, queryStr, pq.StringArray(tags), offset, limit); err != nil {
+	if err := c.db.Select(&out, stmt, 0, nil, queryStr, pq.StringArray(tags), offset, limit, companyID); err != nil {
 		c.log.Printf("error fetching segments: %v", err)
 		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "segments", "error", pqErrMsg(err)))
@@ -46,14 +47,15 @@ func (c *Core) QuerySegments(searchStr string, tags []string, orderBy, order str
 }
 
 // GetSegment retrieves a segment by ID or UUID.
-func (c *Core) GetSegment(id int, uuid string) (models.Segment, error) {
+// companyID=0 disables tenant filtering.
+func (c *Core) GetSegment(id int, uuid string, companyID int) (models.Segment, error) {
 	var uu any
 	if uuid != "" {
 		uu = uuid
 	}
 
 	var out models.Segment
-	if err := c.q.GetSegment.Get(&out, id, uu); err != nil {
+	if err := c.q.GetSegment.Get(&out, id, uu, companyID); err != nil {
 		return out, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "segment", "error", pqErrMsg(err)))
 	}
@@ -73,8 +75,8 @@ func (c *Core) GetSegment(id int, uuid string) (models.Segment, error) {
 	return out, nil
 }
 
-// CreateSegment creates a new segment.
-func (c *Core) CreateSegment(o models.Segment) (models.Segment, error) {
+// CreateSegment creates a new segment. companyID stamps tenant.
+func (c *Core) CreateSegment(o models.Segment, companyID int) (models.Segment, error) {
 	uu, err := uuid.NewV4()
 	if err != nil {
 		c.log.Printf("error generating UUID: %v", err)
@@ -90,13 +92,13 @@ func (c *Core) CreateSegment(o models.Segment) (models.Segment, error) {
 	}
 
 	var id int
-	if err := c.q.CreateSegment.Get(&id, uu, o.Name, o.Description, o.MatchType, o.Conditions, pq.StringArray(o.Tags)); err != nil {
+	if err := c.q.CreateSegment.Get(&id, uu, o.Name, o.Description, o.MatchType, o.Conditions, pq.StringArray(o.Tags), companyID); err != nil {
 		c.log.Printf("error creating segment: %v", err)
 		return models.Segment{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "segment", "error", pqErrMsg(err)))
 	}
 
-	return c.GetSegment(id, "")
+	return c.GetSegment(id, "", 0)
 }
 
 // UpdateSegment updates a segment.
@@ -119,7 +121,7 @@ func (c *Core) UpdateSegment(id int, o models.Segment) (models.Segment, error) {
 			c.i18n.Ts("globals.messages.notFound", "name", "segment"))
 	}
 
-	return c.GetSegment(id, "")
+	return c.GetSegment(id, "", 0)
 }
 
 // DeleteSegment deletes a segment.

@@ -146,6 +146,7 @@ type Config struct {
 	BounceSendgridEnabled     bool
 	BouncePostmarkEnabled     bool
 	BounceForwardemailEnabled bool
+	BounceResendEnabled       bool
 
 	PermissionsRaw json.RawMessage
 	Permissions    map[string]struct{}
@@ -485,6 +486,7 @@ func initConstConfig(ko *koanf.Koanf) *Config {
 	c.BounceSendgridEnabled = ko.Bool("bounce.sendgrid_enabled")
 	c.BouncePostmarkEnabled = ko.Bool("bounce.postmark.enabled")
 	c.BounceForwardemailEnabled = ko.Bool("bounce.forwardemail.enabled")
+	c.BounceResendEnabled = ko.Bool("bounce.resend.enabled")
 	c.HasLegacyUser = ko.Exists("app.admin_username") || ko.Exists("app.admin_password")
 
 	b := md5.Sum([]byte(time.Now().String()))
@@ -594,7 +596,8 @@ func initCampaignManager(msgrs []manager.Messenger, q *models.Queries, u *UrlCon
 
 // initTxTemplates initializes and compiles the transactional templates and caches them in-memory.
 func initTxTemplates(m *manager.Manager, co *core.Core) {
-	tpls, err := co.GetTemplates(models.TemplateTypeTx, false)
+	// Internal startup flow loading all tx templates regardless of tenant.
+	tpls, err := co.GetTemplates(models.TemplateTypeTx, false, 0)
 	if err != nil {
 		lo.Fatalf("error loading transactional templates: %v", err)
 	}
@@ -808,6 +811,13 @@ func initBounceManager(cb func(models.Bounce) error, stmt *sqlx.Stmt, lo *log.Lo
 		}{
 			ko.Bool("bounce.forwardemail.enabled"),
 			ko.String("bounce.forwardemail.key"),
+		},
+		Resend: struct {
+			Enabled    bool
+			SigningKey string
+		}{
+			ko.Bool("bounce.resend.enabled"),
+			ko.String("bounce.resend.signing_key"),
 		},
 		RecordBounceCB: cb,
 	}

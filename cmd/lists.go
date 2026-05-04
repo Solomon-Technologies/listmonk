@@ -22,7 +22,7 @@ func (a *App) GetLists(c echo.Context) error {
 	minimal, _ := strconv.ParseBool(c.FormValue("minimal"))
 	if minimal {
 		status := c.FormValue("status")
-		res, err := a.core.GetLists("", status, hasAllPerm, permittedIDs)
+		res, err := a.core.GetLists("", status, hasAllPerm, permittedIDs, a.tenantFilter(c))
 		if err != nil {
 			return err
 		}
@@ -54,7 +54,7 @@ func (a *App) GetLists(c echo.Context) error {
 
 		pg = a.pg.NewFromURL(c.Request().URL.Query())
 	)
-	res, total, err := a.core.QueryLists(query, typ, optin, status, tags, orderBy, order, hasAllPerm, permittedIDs, pg.Offset, pg.Limit)
+	res, total, err := a.core.QueryLists(query, typ, optin, status, tags, orderBy, order, hasAllPerm, permittedIDs, pg.Offset, pg.Limit, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func (a *App) GetList(c echo.Context) error {
 	}
 
 	// Get the list from the DB.
-	out, err := a.core.GetList(id, "")
+	out, err := a.core.GetList(id, "", a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,11 @@ func (a *App) CreateList(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("lists.invalidName"))
 	}
 
-	out, err := a.core.CreateList(l)
+	// On create, stamp with the user's company_id (regardless of the
+	// enforce_company_isolation flag — new lists must always be tagged
+	// to their owner's tenant). Falls back to Solomon=1 in SQL when 0.
+	user := auth.GetUser(c)
+	out, err := a.core.CreateList(l, user.CompanyID)
 	if err != nil {
 		return err
 	}

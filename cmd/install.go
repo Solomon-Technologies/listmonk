@@ -328,7 +328,7 @@ func installUser(username, password, apiUsername string, q *models.Queries) {
 	}
 
 	// Create the admin user.
-	if _, err := q.CreateUser.Exec(username, true, password, username+"@listmonk", username, auth.RoleTypeUser, role.ID, nil, auth.UserStatusEnabled); err != nil {
+	if _, err := q.CreateUser.Exec(username, true, password, username+"@listmonk", username, auth.RoleTypeUser, role.ID, nil, auth.UserStatusEnabled, 1); err != nil {
 		lo.Fatalf("error creating superadmin user: %v", err)
 	}
 
@@ -345,7 +345,7 @@ func installUser(username, password, apiUsername string, q *models.Queries) {
 			password = null.String{String: tk, Valid: true}
 		)
 
-		if _, err := q.CreateUser.Exec(apiUsername, false, password, email, apiUsername, auth.UserTypeAPI, role.ID, nil, auth.UserStatusEnabled); err != nil {
+		if _, err := q.CreateUser.Exec(apiUsername, false, password, email, apiUsername, auth.UserTypeAPI, role.ID, nil, auth.UserStatusEnabled, 1); err != nil {
 			lo.Fatalf("error creating superadmin API user: %v", err)
 		}
 

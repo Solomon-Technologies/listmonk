@@ -222,6 +222,17 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.PUT("/api/roles/lists/:id", pm(hasID(a.UpdateListRole), "roles:manage"))
 		g.DELETE("/api/roles/:id", pm(hasID(a.DeleteRole), "roles:manage"))
 
+		// Companies (multi-tenant, v7.17.0+).
+		// Reads gated by users:get (anyone who can see users needs the
+		// company picker populated). Writes gated by settings:manage so
+		// only platform admins can add/edit/delete tenants.
+		g.GET("/api/companies", pm(a.GetCompanies, "users:get"))
+		g.GET("/api/companies/stats", pm(a.GetCompanyStats, "settings:manage"))
+		g.GET("/api/companies/:id", pm(a.GetCompany, "users:get"))
+		g.POST("/api/companies", pm(a.CreateCompany, "settings:manage"))
+		g.PUT("/api/companies/:id", pm(a.UpdateCompany, "settings:manage"))
+		g.DELETE("/api/companies/:id", pm(a.DeleteCompany, "settings:manage"))
+
 		// Segments.
 		g.GET("/api/segments", pm(a.GetSegments, "segments:get"))
 		g.GET("/api/segments/:id", pm(hasID(a.GetSegment), "segments:get"))
@@ -487,7 +498,8 @@ func (a *App) hasSub(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		subUUID := c.Param("subUUID")
 
-		if _, err := a.core.GetSubscriber(0, subUUID, ""); err != nil {
+		// Public subscriber UUID lookup (preferences/unsubscribe) — no tenant filter.
+		if _, err := a.core.GetSubscriber(0, subUUID, "", 0); err != nil {
 			if er, ok := err.(*echo.HTTPError); ok && er.Code == http.StatusBadRequest {
 				return c.Render(http.StatusNotFound, tplMessage,
 					makeMsgTpl(a.i18n.T("public.notFoundTitle"), "", er.Message.(string)))

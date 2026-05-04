@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/disintegration/imaging"
+	"github.com/knadh/listmonk/internal/auth"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v4"
 )
@@ -56,7 +57,7 @@ func (a *App) UploadMedia(c echo.Context) error {
 	fName := makeFilename(file.Filename)
 
 	// If the filename already exists in the DB, make it unique by adding a random suffix.
-	if _, err := a.core.GetMedia(0, "", fName, a.media); err == nil {
+	if _, err := a.core.GetMedia(0, "", fName, a.media, a.tenantFilter(c)); err == nil {
 		suffix, err := generateRandomString(6)
 		if err != nil {
 			a.log.Printf("error generating random string: %v", err)
@@ -130,7 +131,8 @@ func (a *App) UploadMedia(c echo.Context) error {
 	}
 
 	// Insert the media into the DB.
-	m, err := a.core.InsertMedia(fName, thumbfName, contentType, meta, a.cfg.MediaUpload.Provider, a.media)
+	user := auth.GetUser(c)
+	m, err := a.core.InsertMedia(fName, thumbfName, contentType, meta, a.cfg.MediaUpload.Provider, a.media, user.CompanyID)
 	if err != nil {
 		cleanUp = true
 		return err
@@ -147,7 +149,7 @@ func (a *App) GetAllMedia(c echo.Context) error {
 		pg = a.pg.NewFromURL(c.Request().URL.Query())
 	)
 	// Fetch the media items from the DB.
-	res, total, err := a.core.QueryMedia(a.cfg.MediaUpload.Provider, a.media, query, pg.Offset, pg.Limit)
+	res, total, err := a.core.QueryMedia(a.cfg.MediaUpload.Provider, a.media, query, pg.Offset, pg.Limit, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}
@@ -166,7 +168,7 @@ func (a *App) GetAllMedia(c echo.Context) error {
 func (a *App) GetMedia(c echo.Context) error {
 	// Fetch the media item from the DB.
 	id := getID(c)
-	out, err := a.core.GetMedia(id, "", "", a.media)
+	out, err := a.core.GetMedia(id, "", "", a.media, a.tenantFilter(c))
 	if err != nil {
 		return err
 	}

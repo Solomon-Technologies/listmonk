@@ -1,12 +1,14 @@
 -- subscribers
 -- name: get-subscriber
 -- Get a single subscriber by id or UUID or email.
+-- $4 = company_id (v7.17.0); 0 disables filter, >0 scopes lookup.
 SELECT * FROM subscribers WHERE
     CASE
         WHEN $1 > 0 THEN id = $1
         WHEN $2 != '' THEN uuid = $2::UUID
         WHEN $3 != '' THEN email = $3
-    END;
+    END
+    AND ($4::INT = 0 OR company_id = $4::INT);
 
 -- name: has-subscriber-list
 -- Used for checking access permission by list.
@@ -292,6 +294,8 @@ SELECT subscribers.* FROM subscribers
     WHERE (CARDINALITY($1) = 0 OR subscriber_lists.list_id = ANY($1::INT[]))
     AND (CASE WHEN $3 != '' THEN name ~* $3 OR email ~* $3 ELSE TRUE END)
     AND %query%
+    -- Multi-tenant filter (v7.17.0): $6=0 disables, else scope to company.
+    AND ($6::INT = 0 OR subscribers.company_id = $6::INT)
     ORDER BY %order% OFFSET $4 LIMIT (CASE WHEN $5 < 1 THEN NULL ELSE $5 END);
 
 -- name: query-subscribers-count
@@ -306,7 +310,9 @@ SELECT COUNT(*) AS total FROM subscribers
     )
     WHERE (CARDINALITY($1) = 0 OR subscriber_lists.list_id = ANY($1::INT[]))
     AND (CASE WHEN $3 != '' THEN name ~* $3 OR email ~* $3 ELSE TRUE END)
-    AND %query%;
+    AND %query%
+    -- Multi-tenant filter (v7.17.0): $4=0 disables, else scope to company.
+    AND ($4::INT = 0 OR subscribers.company_id = $4::INT);
 
 -- name: query-subscribers-count-all
 -- Cached query for getting the "all" subscriber count without arbitrary conditions.
