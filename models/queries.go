@@ -134,6 +134,7 @@ type Queries struct {
 	GetUsers           *sqlx.Stmt `query:"get-users"`
 	GetUser            *sqlx.Stmt `query:"get-user"`
 	GetAPITokens       *sqlx.Stmt `query:"get-api-tokens"`
+	RegenerateAPIToken *sqlx.Stmt `query:"regenerate-api-token"`
 	LoginUser          *sqlx.Stmt `query:"login-user"`
 	DeleteUserSessions *sqlx.Stmt `query:"delete-user-sessions"`
 

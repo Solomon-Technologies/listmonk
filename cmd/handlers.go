@@ -205,6 +205,7 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.GET("/api/users/:id", pm(hasID(a.GetUser), "users:get"))
 		g.POST("/api/users", pm(a.CreateUser, "users:manage"))
 		g.PUT("/api/users/:id", pm(hasID(a.UpdateUser), "users:manage"))
+		g.POST("/api/users/:id/regenerate-token", pm(hasID(a.RegenerateAPIToken), "users:manage"))
 		g.DELETE("/api/users", pm(a.DeleteUsers, "users:manage"))
 		g.DELETE("/api/users/:id", pm(hasID(a.DeleteUser), "users:manage"))
 		g.POST("/api/logout", a.Logout)

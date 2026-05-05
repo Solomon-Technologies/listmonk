@@ -173,6 +173,15 @@ func initFlags(ko *koanf.Koanf) {
 	f.String("i18n-dir", "", "(optional) path to directory with i18n language files")
 	f.Bool("yes", false, "assume 'yes' to prompts during --install/upgrade")
 	f.Bool("passive", false, "run in passive mode where campaigns are not processed")
+
+	// Solomon fork: tenant-scoped API user creation via CLI. See cmd/cli_apikey.go.
+	// Requires --username --company-id --role-id. Optional --name.
+	f.Bool("create-api-user", false, "mint a tenant-scoped API user + token, print to stdout, then exit")
+	f.String("username", "", "username for --create-api-user")
+	f.String("name", "", "display name for --create-api-user (defaults to username)")
+	f.Int("company-id", 0, "company_id (tenant) for --create-api-user")
+	f.Int("role-id", 0, "user_role_id for --create-api-user (must belong to the same company-id)")
+
 	if err := f.Parse(os.Args[1:]); err != nil {
 		lo.Fatalf("error loading flags: %v", err)
 	}
