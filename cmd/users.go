@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"net/http"
 	"regexp"
 	"strings"
@@ -181,6 +183,56 @@ func (a *App) UpdateUser(c echo.Context) error {
 	}
 
 	// Cache the API token for in-memory, off-DB /api/* request auth.
+	if _, err := cacheUsers(a.core, a.auth); err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, okResp{user})
+}
+
+// RegenerateAPIToken mints a new opaque token for an existing API user and
+// replaces it in the DB. Returns the new token in the response body (one-time
+// reveal). Tenant-scoped: when company isolation is on, the requester must
+// belong to the same company as the target user.
+//
+// Solomon fork addition (v7.17.0+).
+func (a *App) RegenerateAPIToken(c echo.Context) error {
+	id := getID(c)
+
+	target, err := a.core.GetUser(id, "", "")
+	if err != nil {
+		return err
+	}
+	if target.Type != auth.UserTypeAPI {
+		return echo.NewHTTPError(http.StatusBadRequest,
+			a.i18n.Ts("globals.messages.invalidFields", "name", "type"))
+	}
+
+	// Tenant scope check. Skip when isolation is off (legacy single-tenant mode).
+	if a.tenantFilter(c) != 0 {
+		requester := auth.GetUser(c)
+		if target.CompanyID != requester.CompanyID {
+			return echo.NewHTTPError(http.StatusForbidden,
+				a.i18n.Ts("globals.messages.permissionDenied", "name", "user"))
+		}
+	}
+
+	// 32 random bytes → URL-safe base64 (no padding). Matches the spec used by
+	// other Solomon-fork tenant secrets.
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError,
+			a.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.user}", "error", err.Error()))
+	}
+	token := base64.RawURLEncoding.EncodeToString(buf)
+
+	user, err := a.core.RegenerateAPIToken(id, token)
+	if err != nil {
+		return err
+	}
+
+	// Refresh in-memory cache so the new token authenticates immediately
+	// without a service restart.
 	if _, err := cacheUsers(a.core, a.auth); err != nil {
 		return err
 	}

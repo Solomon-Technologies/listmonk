@@ -73,6 +73,32 @@ func (c *Core) CreateUser(u auth.User) (auth.User, error) {
 	return out, err
 }
 
+// RegenerateAPIToken replaces the password (token) of an existing API user
+// with the supplied opaque token string. Returns the refreshed user record
+// (with the new token visible in Password). The handler is responsible for
+// (a) tenant-scope permission checks, (b) generating the random token, and
+// (c) refreshing the in-memory auth cache afterwards.
+func (c *Core) RegenerateAPIToken(id int, token string) (auth.User, error) {
+	res, err := c.q.RegenerateAPIToken.Exec(id, token)
+	if err != nil {
+		return auth.User{}, echo.NewHTTPError(http.StatusInternalServerError,
+			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.user}", "error", pqErrMsg(err)))
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return auth.User{}, echo.NewHTTPError(http.StatusNotFound,
+			c.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.user}"))
+	}
+
+	out, err := c.GetUser(id, "", "")
+	if err != nil {
+		return out, err
+	}
+	// The returned user carries the new token in Password so the handler can
+	// surface it to the operator one time.
+	out.Password = null.String{String: token, Valid: true}
+	return out, nil
+}
+
 // UpdateUser updates a given user.
 func (c *Core) UpdateUser(id int, u auth.User) (auth.User, error) {
 	listRoleID := 0

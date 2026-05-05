@@ -135,6 +135,12 @@ FROM sel
 -- name: get-api-tokens
 SELECT username, password FROM users WHERE status='enabled' AND type='api';
 
+-- name: regenerate-api-token
+-- Solomon fork: replace the API token (password column) for an existing API user.
+-- Tenant scope is enforced by the caller (handler verifies user.company_id matches).
+UPDATE users SET password=$2, updated_at=NOW()
+    WHERE id=$1 AND type='api';
+
 -- name: login-user
 WITH u AS (
     SELECT users.*, r.name as role_name, r.permissions FROM users

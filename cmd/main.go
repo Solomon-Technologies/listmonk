@@ -257,6 +257,16 @@ func main() {
 		chReload = make(chan os.Signal, 1)
 	)
 
+	// Solomon fork: short-circuit CLI subcommand for tenant API user creation.
+	// Runs against an initialized core, then exits before any messenger / manager /
+	// HTTP server boots so an operator can run `./listmonk --create-api-user ...` on
+	// a host that already has a long-running listmonk service without colliding on
+	// the port. See cmd/cli_apikey.go.
+	if ko.Bool("create-api-user") {
+		runCreateAPIUser(core)
+		return
+	}
+
 	// Initialize the bounce manager that processes bounces from webhooks and
 	// POP3 mailbox scanning.
 	if ko.Bool("bounce.enabled") {
