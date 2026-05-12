@@ -503,8 +503,9 @@ func (c *Core) InsertCampaignSendLog(campaignID, subscriberID int, email, messen
 }
 
 // QueryCampaignSendLog returns a paginated list of send records for a campaign
-// with optional email + status filters. total is the full match count.
-func (c *Core) QueryCampaignSendLog(campaignID int, emailFilter, statusFilter string, limit, offset int) ([]models.CampaignSendLogEntry, int, error) {
+// with optional email + status + date-range filters. total is the full match
+// count for pagination. Pass zero-value time.Time to skip a range bound.
+func (c *Core) QueryCampaignSendLog(campaignID int, emailFilter, statusFilter string, from, to time.Time, limit, offset int) ([]models.CampaignSendLogEntry, int, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -512,8 +513,19 @@ func (c *Core) QueryCampaignSendLog(campaignID int, emailFilter, statusFilter st
 		limit = 500
 	}
 
+	// sqlx maps a zero time.Time to NULL via interface conversion only if we
+	// hand it a *time.Time or nil interface; passing a zero value would marshal
+	// as '0001-01-01' and break the IS NULL check. Convert explicitly.
+	var fromArg, toArg interface{}
+	if !from.IsZero() {
+		fromArg = from
+	}
+	if !to.IsZero() {
+		toArg = to
+	}
+
 	rows := []models.CampaignSendLogEntry{}
-	if err := c.q.QueryCampaignSendLog.Select(&rows, campaignID, emailFilter, statusFilter, limit, offset); err != nil {
+	if err := c.q.QueryCampaignSendLog.Select(&rows, campaignID, emailFilter, statusFilter, fromArg, toArg, limit, offset); err != nil {
 		c.log.Printf("error querying campaign send log: %s", err)
 		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.campaign}", "error", pqErrMsg(err)))
@@ -527,9 +539,19 @@ func (c *Core) QueryCampaignSendLog(campaignID int, emailFilter, statusFilter st
 }
 
 // QueryCampaignSendLogStats returns header aggregates for the Send Log tab.
-func (c *Core) QueryCampaignSendLogStats(campaignID int) (models.CampaignSendLogStats, error) {
+// Honors the same date-range filter as QueryCampaignSendLog so the counters
+// match the table view. Pass zero-value time.Time to skip a range bound.
+func (c *Core) QueryCampaignSendLogStats(campaignID int, from, to time.Time) (models.CampaignSendLogStats, error) {
+	var fromArg, toArg interface{}
+	if !from.IsZero() {
+		fromArg = from
+	}
+	if !to.IsZero() {
+		toArg = to
+	}
+
 	out := models.CampaignSendLogStats{}
-	if err := c.q.QueryCampaignSendLogStats.Get(&out, campaignID); err != nil {
+	if err := c.q.QueryCampaignSendLogStats.Get(&out, campaignID, fromArg, toArg); err != nil {
 		c.log.Printf("error querying campaign send log stats: %s", err)
 		return out, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.campaign}", "error", pqErrMsg(err)))

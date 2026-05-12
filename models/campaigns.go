@@ -236,19 +236,25 @@ func (c *Campaign) ConvertContent(from, to string) (string, error) {
 }
 
 // CampaignSendLogEntry is one row from campaign_send_log, joined with
-// subscribers for display. Used by the "Send Log" UI tab.
+// subscribers for display. Used by the "Send Log" UI tab. The Opened/Clicked/
+// Bounced flags are computed from EXISTS sub-selects against campaign_views,
+// link_clicks, and bounces so the operator sees per-recipient engagement
+// inline without leaving the campaign page.
 type CampaignSendLogEntry struct {
-	ID              int64     `db:"id" json:"id"`
-	CampaignID      int       `db:"campaign_id" json:"campaign_id"`
-	SubscriberID    int       `db:"subscriber_id" json:"subscriber_id"`
+	ID              int64       `db:"id" json:"id"`
+	CampaignID      int         `db:"campaign_id" json:"campaign_id"`
+	SubscriberID    int         `db:"subscriber_id" json:"subscriber_id"`
 	SubscriberUUID  null.String `db:"subscriber_uuid" json:"subscriber_uuid"`
-	SubscriberEmail string    `db:"subscriber_email" json:"subscriber_email"`
+	SubscriberEmail string      `db:"subscriber_email" json:"subscriber_email"`
 	SubscriberName  null.String `db:"subscriber_name" json:"subscriber_name"`
-	SentAt          time.Time `db:"sent_at" json:"sent_at"`
-	Messenger       string    `db:"messenger" json:"messenger"`
-	Status          string    `db:"status" json:"status"`
+	SentAt          time.Time   `db:"sent_at" json:"sent_at"`
+	Messenger       string      `db:"messenger" json:"messenger"`
+	Status          string      `db:"status" json:"status"`
 	ErrorMessage    null.String `db:"error_message" json:"error_message"`
-	Total           int       `db:"total" json:"-"`
+	Opened          bool        `db:"opened" json:"opened"`
+	Clicked         bool        `db:"clicked" json:"clicked"`
+	Bounced         bool        `db:"bounced" json:"bounced"`
+	Total           int         `db:"total" json:"-"`
 }
 
 // CampaignSendLogStats is the header aggregate for the Send Log tab.

@@ -550,21 +550,37 @@ INSERT INTO campaign_send_log (campaign_id, subscriber_id, subscriber_email, mes
 VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''));
 
 -- name: query-campaign-send-log
--- Paginated send log for a specific campaign. Supports optional email filter.
+-- Paginated send log for a specific campaign with optional email, status, and
+-- date-range filters. The opened/clicked/bounced flags are EXISTS sub-selects
+-- so the operator sees per-recipient engagement directly on the row.
+-- $4 / $5 are TIMESTAMPTZ-or-NULL boundaries; pass NULL to skip the filter.
 SELECT csl.id, csl.campaign_id, csl.subscriber_id, csl.subscriber_email,
        csl.sent_at, csl.messenger, csl.status, csl.error_message,
        s.uuid AS subscriber_uuid, s.name AS subscriber_name,
+       EXISTS (SELECT 1 FROM campaign_views v
+               WHERE v.campaign_id = csl.campaign_id
+                 AND v.subscriber_id = csl.subscriber_id) AS opened,
+       EXISTS (SELECT 1 FROM link_clicks lc
+               WHERE lc.campaign_id = csl.campaign_id
+                 AND lc.subscriber_id = csl.subscriber_id) AS clicked,
+       EXISTS (SELECT 1 FROM bounces b
+               WHERE b.campaign_id = csl.campaign_id
+                 AND b.subscriber_id = csl.subscriber_id) AS bounced,
        COUNT(*) OVER () AS total
 FROM campaign_send_log csl
 LEFT JOIN subscribers s ON s.id = csl.subscriber_id
 WHERE csl.campaign_id = $1
   AND ($2 = '' OR csl.subscriber_email ILIKE '%' || $2 || '%')
   AND ($3 = '' OR csl.status = $3)
+  AND ($4::TIMESTAMPTZ IS NULL OR csl.sent_at >= $4::TIMESTAMPTZ)
+  AND ($5::TIMESTAMPTZ IS NULL OR csl.sent_at <  $5::TIMESTAMPTZ)
 ORDER BY csl.sent_at DESC, csl.id DESC
-LIMIT $4 OFFSET $5;
+LIMIT $6 OFFSET $7;
 
 -- name: query-campaign-send-log-stats
--- Aggregate counts for the header stats on the Send Log tab.
+-- Aggregate counts for the header stats on the Send Log tab. Same date-range
+-- filters as query-campaign-send-log so the counters reflect what the table
+-- shows. $2 / $3 are TIMESTAMPTZ-or-NULL boundaries.
 SELECT
     COUNT(*)                                          AS total_logged,
     COUNT(*) FILTER (WHERE status = 'sent')           AS total_sent,
@@ -572,7 +588,9 @@ SELECT
     MIN(sent_at)                                      AS first_sent_at,
     MAX(sent_at)                                      AS last_sent_at
 FROM campaign_send_log
-WHERE campaign_id = $1;
+WHERE campaign_id = $1
+  AND ($2::TIMESTAMPTZ IS NULL OR sent_at >= $2::TIMESTAMPTZ)
+  AND ($3::TIMESTAMPTZ IS NULL OR sent_at <  $3::TIMESTAMPTZ);
 
 -- name: delete-failed-campaign-sends
 -- Solomon fork: clears failed-status rows from campaign_send_log for a single

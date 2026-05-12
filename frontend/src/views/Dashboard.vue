@@ -271,16 +271,22 @@
                   <router-link :to="{ name: 'campaign', params: { id: props.row.id } }">{{ props.row.name }}</router-link>
                 </b-table-column>
                 <b-table-column field="sent" label="Sent / Queued" v-slot="props">
-                  {{ props.row.sent.toLocaleString() }} / {{ props.row.to_send.toLocaleString() }}
+                  {{ props.row.sent.toLocaleString() }} / {{ (props.row.toSend || 0).toLocaleString() }}
                 </b-table-column>
-                <b-table-column field="last_sent_at" label="Last send" v-slot="props">
-                  <span v-if="props.row.last_sent_at" :class="{ 'has-text-danger': props.row.stalled }">
-                    {{ $utils.niceDate(props.row.last_sent_at, true) }}
+                <b-table-column field="sentToday" label="Today" v-slot="props" width="80">
+                  <strong>{{ (props.row.sentToday || 0).toLocaleString() }}</strong>
+                </b-table-column>
+                <b-table-column field="sent7d" label="7d" v-slot="props" width="80">
+                  {{ (props.row.sent7d || 0).toLocaleString() }}
+                </b-table-column>
+                <b-table-column field="lastSentAt" label="Last send" v-slot="props">
+                  <span v-if="props.row.lastSentAt" :class="{ 'has-text-danger': props.row.stalled }">
+                    {{ $utils.niceDate(props.row.lastSentAt, true) }}
                   </span>
                   <span v-else class="has-text-grey">never</span>
                 </b-table-column>
                 <b-table-column field="rate" label="Send rate" v-slot="props">
-                  <span class="has-text-grey">{{ props.row.send_rate || 0 }}/min</span>
+                  <span class="has-text-grey">{{ props.row.sendRate || 0 }}/min</span>
                 </b-table-column>
               </b-table>
               <p v-if="anyStalled" class="mt-3 is-size-7 has-text-grey">
@@ -384,52 +390,69 @@ export default Vue.extend({
     // pull the send-log stats (last_sent_at) and the live send-rate, compute
     // stalled/idle flags, sort STALLED first so the operator sees the problem.
     loadHealth() {
+      // The shared $api.http response interceptor already unwraps resp.data.data
+      // and camelCases keys, so `res` here is the inner payload directly with
+      // camelCase fields (toSend, lastSentAt, sendRate). Earlier versions read
+      // res.data.data.* and snake_case which silently produced empty rows.
       this.$api.http.get('/api/campaigns?per_page=100')
         .then((res) => {
-          const all = ((res.data && res.data.data && res.data.data.results) || []);
+          const all = (res && res.results) || [];
           const running = all.filter((c) => c.status === 'running');
           if (running.length === 0) {
             this.health = [];
             return;
           }
-          // Build base rows; we'll fill in last_sent_at + send_rate per campaign.
+          // Build base rows; we'll fill in lastSentAt + sendRate + today/7d
+          // counts per campaign in parallel below.
           const rows = running.map((c) => ({
             id: c.id,
             name: c.name,
             sent: c.sent || 0,
-            to_send: c.to_send || 0,
-            last_sent_at: null,
-            send_rate: 0,
+            toSend: c.toSend || 0,
+            lastSentAt: null,
+            sendRate: 0,
+            sentToday: 0,
+            sent7d: 0,
             stalled: false,
             idle: false,
           }));
 
           // Fetch send-rate map (one call covers all running campaigns).
           this.$api.http.get('/api/campaigns/running/stats').then((statsRes) => {
-            const list = (statsRes.data && statsRes.data.data) || [];
+            const list = (statsRes && Array.isArray(statsRes) ? statsRes : (statsRes.results || statsRes || [])) || [];
             const rateById = {};
-            list.forEach((s) => { rateById[s.id] = s.send_rate || 0; });
-            rows.forEach((_, i) => { rows[i] = { ...rows[i], send_rate: rateById[rows[i].id] || 0 }; });
+            list.forEach((s) => { rateById[s.id] = s.sendRate || 0; });
+            rows.forEach((_, i) => { rows[i] = { ...rows[i], sendRate: rateById[rows[i].id] || 0 }; });
           }).catch(() => { /* non-fatal */ });
 
-          // Fetch last_sent_at per campaign in parallel. Index-keyed mutation
-          // (rather than mutating the row param) keeps eslint no-param-reassign
-          // happy.
+          // Fetch lifetime stats + today + 7-day stats per campaign in parallel.
           const STALL_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
-          const now = Date.now();
-          Promise.all(rows.map((row, i) => this.$api.http.get(`/api/campaigns/${row.id}/send-log/stats`)
-            .then((sr) => {
-              const stats = (sr.data && sr.data.data) || {};
-              const lastSentAt = stats.last_sent_at || null;
-              const stalled = lastSentAt
-                ? (now - new Date(lastSentAt).getTime()) > STALL_THRESHOLD_MS
-                : false;
-              const idle = !lastSentAt;
-              rows[i] = {
-                ...rows[i], last_sent_at: lastSentAt, stalled, idle,
-              };
-            })
-            .catch(() => { /* non-fatal */ }))).then(() => {
+          const now = new Date();
+          const startOfToday = new Date(now);
+          startOfToday.setHours(0, 0, 0, 0);
+          const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          const todayIso = startOfToday.toISOString();
+          const sevenIso = sevenDaysAgo.toISOString();
+          Promise.all(rows.map((row, i) => Promise.all([
+            this.$api.http.get(`/api/campaigns/${row.id}/send-log/stats`).catch(() => null),
+            this.$api.http.get(`/api/campaigns/${row.id}/send-log/stats?from=${encodeURIComponent(todayIso)}`).catch(() => null),
+            this.$api.http.get(`/api/campaigns/${row.id}/send-log/stats?from=${encodeURIComponent(sevenIso)}`).catch(() => null),
+          ]).then(([sr, today, week]) => {
+            const stats = sr || {};
+            const lastSentAt = stats.lastSentAt || null;
+            const stalled = lastSentAt
+              ? (now.getTime() - new Date(lastSentAt).getTime()) > STALL_THRESHOLD_MS
+              : false;
+            const idle = !lastSentAt;
+            rows[i] = {
+              ...rows[i],
+              lastSentAt,
+              stalled,
+              idle,
+              sentToday: (today && today.totalSent) || 0,
+              sent7d: (week && week.totalSent) || 0,
+            };
+          }))).then(() => {
             // Stalled rows first, then idle, then sending.
             rows.sort((a, b) => (b.stalled - a.stalled) || (b.idle - a.idle));
             this.health = rows;

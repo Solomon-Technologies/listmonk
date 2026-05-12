@@ -354,27 +354,27 @@
       <b-tab-item label="Send Log" icon="format-list-checks" value="sendlog" :disabled="isNew">
         <section class="wrap-small">
           <div v-if="sendLogStats" class="columns">
-            <div class="column"><p class="has-text-grey is-size-7">TOTAL</p><p class="is-size-4">{{ sendLogStats.total_logged.toLocaleString() }}</p></div>
-            <div class="column"><p class="has-text-grey is-size-7">SENT</p><p class="is-size-4 has-text-success">{{ sendLogStats.total_sent.toLocaleString() }}</p></div>
-            <div class="column"><p class="has-text-grey is-size-7">FAILED</p><p class="is-size-4 has-text-danger">{{ sendLogStats.total_failed.toLocaleString() }}</p></div>
-            <div class="column"><p class="has-text-grey is-size-7">FIRST</p><p class="is-size-7">{{ sendLogStats.first_sent_at ? $utils.niceDate(sendLogStats.first_sent_at, true) : '—' }}</p></div>
-            <div class="column"><p class="has-text-grey is-size-7">LAST</p><p class="is-size-7">{{ sendLogStats.last_sent_at ? $utils.niceDate(sendLogStats.last_sent_at, true) : '—' }}</p></div>
+            <div class="column"><p class="has-text-grey is-size-7">TOTAL (filtered)</p><p class="is-size-4">{{ (sendLogStats.totalLogged || 0).toLocaleString() }}</p></div>
+            <div class="column"><p class="has-text-grey is-size-7">SENT</p><p class="is-size-4 has-text-success">{{ (sendLogStats.totalSent || 0).toLocaleString() }}</p></div>
+            <div class="column"><p class="has-text-grey is-size-7">FAILED</p><p class="is-size-4 has-text-danger">{{ (sendLogStats.totalFailed || 0).toLocaleString() }}</p></div>
+            <div class="column"><p class="has-text-grey is-size-7">FIRST</p><p class="is-size-7">{{ sendLogStats.firstSentAt ? $utils.niceDate(sendLogStats.firstSentAt, true) : '—' }}</p></div>
+            <div class="column"><p class="has-text-grey is-size-7">LAST</p><p class="is-size-7">{{ sendLogStats.lastSentAt ? $utils.niceDate(sendLogStats.lastSentAt, true) : '—' }}</p></div>
           </div>
 
           <!-- Solomon fork: surface failed sends so the operator can see + retry
                them without psql. Common case: Resend/SES daily quota tripped,
                worker logged 'failed' once, never retried. Click re-queues. -->
-          <b-message v-if="sendLogStats && sendLogStats.total_failed > 0" type="is-warning" class="mb-3">
+          <b-message v-if="sendLogStats && sendLogStats.totalFailed > 0" type="is-warning" class="mb-3">
             <div class="columns is-vcentered">
               <div class="column">
-                <strong>{{ sendLogStats.total_failed.toLocaleString() }}</strong> sends failed.
+                <strong>{{ sendLogStats.totalFailed.toLocaleString() }}</strong> sends failed.
                 Most common causes: SMTP daily-quota exceeded, transient connection errors, or rate-limit caps.
                 Use the Status filter below to inspect them. Retrying deletes the failed log rows so the
                 campaign worker re-queues those subscribers.
               </div>
               <div class="column is-narrow">
                 <b-button type="is-warning" icon-left="refresh" @click="onRetryFailed" :loading="sendLogRetrying">
-                  Retry {{ sendLogStats.total_failed.toLocaleString() }} failed
+                  Retry {{ sendLogStats.totalFailed.toLocaleString() }} failed
                 </b-button>
               </div>
             </div>
@@ -383,7 +383,17 @@
           <div class="columns">
             <div class="column"><b-input v-model="sendLogEmailFilter" placeholder="Filter by email" icon="magnify" @input="onSendLogFilter" /></div>
             <div class="column is-one-quarter">
-              <b-select v-model="sendLogStatusFilter" expanded @input="loadSendLog">
+              <b-select v-model="sendLogDatePreset" expanded @input="onSendLogDatePreset">
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="24h">Last 24 hours</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="all">All time</option>
+              </b-select>
+            </div>
+            <div class="column is-one-quarter">
+              <b-select v-model="sendLogStatusFilter" expanded @input="onSendLogReload">
                 <option value="">All statuses</option>
                 <option value="sent">Sent</option>
                 <option value="failed">Failed</option>
@@ -394,13 +404,19 @@
           <b-table :data="sendLogRows" :loading="sendLogLoading" :paginated="true" :per-page="sendLogPerPage"
             backend-pagination :total="sendLogTotal" :current-page.sync="sendLogPage" @page-change="onSendLogPage"
             :sticky-header="true" striped>
-            <b-table-column field="sent_at" label="Sent at" v-slot="props" width="160">
-              {{ $utils.niceDate(props.row.sent_at, true) }}
+            <b-table-column field="sentAt" label="Sent at" v-slot="props" width="160">
+              {{ $utils.niceDate(props.row.sentAt, true) }}
             </b-table-column>
-            <b-table-column field="subscriber_email" label="Email" v-slot="props">
-              <router-link v-if="props.row.subscriber_uuid" :to="`/subscribers/${props.row.subscriber_id}`">{{ props.row.subscriber_email }}</router-link>
-              <span v-else>{{ props.row.subscriber_email }}</span>
-              <span v-if="props.row.subscriber_name" class="has-text-grey is-size-7">&nbsp;({{ props.row.subscriber_name }})</span>
+            <b-table-column field="subscriberEmail" label="Email" v-slot="props">
+              <router-link v-if="props.row.subscriberUuid" :to="`/subscribers/${props.row.subscriberId}`">{{ props.row.subscriberEmail }}</router-link>
+              <span v-else>{{ props.row.subscriberEmail }}</span>
+              <span v-if="props.row.subscriberName" class="has-text-grey is-size-7">&nbsp;({{ props.row.subscriberName }})</span>
+            </b-table-column>
+            <b-table-column label="Activity" v-slot="props" width="180">
+              <b-tag v-if="props.row.bounced" type="is-danger" class="mr-1">bounced</b-tag>
+              <b-tag v-if="props.row.clicked" type="is-info" class="mr-1">clicked</b-tag>
+              <b-tag v-else-if="props.row.opened" type="is-success" class="mr-1">opened</b-tag>
+              <span v-if="!props.row.opened && !props.row.clicked && !props.row.bounced" class="has-text-grey is-size-7">—</span>
             </b-table-column>
             <b-table-column field="messenger" label="Messenger" v-slot="props" width="120">
               <span class="has-text-grey">{{ props.row.messenger || '—' }}</span>
@@ -409,11 +425,11 @@
               <b-tag v-if="props.row.status === 'sent'" type="is-success is-light">sent</b-tag>
               <b-tag v-else type="is-danger is-light">failed</b-tag>
             </b-table-column>
-            <b-table-column field="error_message" label="Error" v-slot="props">
-              <span v-if="props.row.error_message" class="has-text-danger is-size-7">{{ props.row.error_message }}</span>
+            <b-table-column field="errorMessage" label="Error" v-slot="props">
+              <span v-if="props.row.errorMessage" class="has-text-danger is-size-7">{{ props.row.errorMessage }}</span>
             </b-table-column>
             <template #empty>
-              <div class="has-text-centered has-text-grey p-4">No send records yet. Send a campaign to populate the log.</div>
+              <div class="has-text-centered has-text-grey p-4">No send records in this date range.</div>
             </template>
           </b-table>
         </section>
@@ -481,6 +497,11 @@ export default Vue.extend({
       sendLogEmailFilter: '',
       sendLogStatusFilter: '',
       sendLogLoading: false,
+      // Date filter (default: today). Computed `sendLogFromIso`/`sendLogToIso`
+      // are passed as ISO-8601 query params on every load.
+      sendLogDatePreset: 'today',
+      sendLogFromIso: '',
+      sendLogToIso: '',
       sendLogStats: null,
       sendLogFilterTimer: null,
       sendLogRetrying: false,
@@ -579,17 +600,23 @@ export default Vue.extend({
       // Solomon fork: lazy-load send log when tab opens. Also handled by the
       // activeTab watcher below — keeping this call too so an explicit click
       // always refreshes the data (handles "user came back to the tab from
-      // another tab and expects fresh numbers").
+      // another tab and expects fresh numbers"). The date preset handler
+      // computes from/to ISO strings and calls reload, so we only need to
+      // call it (no separate loadSendLog/loadSendLogStats call).
       if (tab === 'sendlog' && this.data.id) {
-        this.loadSendLogStats();
-        this.loadSendLog();
+        this.onSendLogDatePreset();
       }
 
       // this.$router.replace({ hash: `#${tab}` });
       window.history.replaceState({}, '', `#${tab}`);
     },
 
-    // Send Log tab — Solomon fork
+    // Send Log tab — Solomon fork.
+    // The shared $api.http response interceptor (frontend/src/api/index.js:29-66)
+    // unwraps resp.data.data and camelCases the keys before resolving. So `res`
+    // here is the inner payload (results/total/perPage), not the raw axios
+    // response object. Earlier versions of these methods read res.data.data.*
+    // and snake_case fields, which silently produced empty rows.
     loadSendLog() {
       if (!this.data.id) return;
       this.sendLogLoading = true;
@@ -599,11 +626,12 @@ export default Vue.extend({
       });
       if (this.sendLogEmailFilter) params.set('email', this.sendLogEmailFilter);
       if (this.sendLogStatusFilter) params.set('status', this.sendLogStatusFilter);
+      if (this.sendLogFromIso) params.set('from', this.sendLogFromIso);
+      if (this.sendLogToIso) params.set('to', this.sendLogToIso);
       this.$api.http.get(`/api/campaigns/${this.data.id}/send-log?${params.toString()}`)
         .then((res) => {
-          const d = res.data && res.data.data ? res.data.data : res.data;
-          this.sendLogRows = d.results || [];
-          this.sendLogTotal = d.total || 0;
+          this.sendLogRows = res.results || [];
+          this.sendLogTotal = res.total || 0;
         })
         .catch((err) => {
           this.$utils.toast(err.message || 'Failed to load send log', 'is-danger');
@@ -613,10 +641,14 @@ export default Vue.extend({
 
     loadSendLogStats() {
       if (!this.data.id) return;
-      this.$api.http.get(`/api/campaigns/${this.data.id}/send-log/stats`)
+      const params = new URLSearchParams();
+      if (this.sendLogFromIso) params.set('from', this.sendLogFromIso);
+      if (this.sendLogToIso) params.set('to', this.sendLogToIso);
+      const qs = params.toString();
+      const url = `/api/campaigns/${this.data.id}/send-log/stats${qs ? `?${qs}` : ''}`;
+      this.$api.http.get(url)
         .then((res) => {
-          const d = res.data && res.data.data ? res.data.data : res.data;
-          this.sendLogStats = d;
+          this.sendLogStats = res || null;
         })
         .catch(() => { /* non-fatal */ });
     },
@@ -635,13 +667,65 @@ export default Vue.extend({
       }, 400);
     },
 
+    // Reset to page 1 + reload list AND header stats so the counters reflect
+    // the new filter (used by status dropdown change).
+    onSendLogReload() {
+      this.sendLogPage = 1;
+      this.loadSendLogStats();
+      this.loadSendLog();
+    },
+
+    // Convert the date-preset selection into ISO from/to strings, then reload.
+    // All windows are anchored to the operator's local clock (matches what
+    // they see in their browser); the API stores in UTC so we send ISO-8601
+    // including the local TZ offset and Postgres handles the conversion.
+    onSendLogDatePreset() {
+      const now = new Date();
+      const startOfDay = (d) => {
+        const x = new Date(d);
+        x.setHours(0, 0, 0, 0);
+        return x;
+      };
+      let from = null;
+      let to = null;
+      switch (this.sendLogDatePreset) {
+        case 'today':
+          from = startOfDay(now);
+          break;
+        case 'yesterday': {
+          const y = new Date(now);
+          y.setDate(y.getDate() - 1);
+          from = startOfDay(y);
+          to = startOfDay(now);
+          break;
+        }
+        case '24h':
+          from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case '7d':
+          from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '30d':
+          from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case 'all':
+        default:
+          from = null;
+          to = null;
+          break;
+      }
+      this.sendLogFromIso = from ? from.toISOString() : '';
+      this.sendLogToIso = to ? to.toISOString() : '';
+      this.onSendLogReload();
+    },
+
     // Solomon fork: deletes status='failed' rows from campaign_send_log so the
     // worker treats those subscribers as un-attempted and re-queues them on
     // the next pipe pass. Common case: SMTP daily-quota exceeded once, then
     // the rows sit forever as silent permanent failures.
     onRetryFailed() {
       this.$buefy.dialog.confirm({
-        message: `Re-queue the ${this.sendLogStats.total_failed.toLocaleString()} failed sends? `
+        message: `Re-queue the ${this.sendLogStats.totalFailed.toLocaleString()} failed sends? `
           + 'They\'ll be re-attempted on the next worker pass (rate-limited as normal).',
         confirmText: 'Retry',
         type: 'is-warning',
@@ -1026,8 +1110,7 @@ export default Vue.extend({
     // watcher the table renders empty even when campaign_send_log has rows.
     activeTab(val) {
       if (val === 'sendlog' && this.data.id) {
-        this.loadSendLogStats();
-        this.loadSendLog();
+        this.onSendLogDatePreset();
       }
     },
   },
