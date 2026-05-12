@@ -1113,6 +1113,19 @@ export default Vue.extend({
         this.onSendLogDatePreset();
       }
     },
+
+    // Solomon fork: race-fix. The user often clicks the Send Log tab before
+    // getCampaign() resolves, so this.data.id is undefined when the activeTab
+    // watcher above fires and the load short-circuits. By the time data.id
+    // arrives, activeTab is already 'sendlog' so its watcher won't re-fire.
+    // Watch data.id directly: when it transitions from falsy to truthy AND
+    // the operator is sitting on the sendlog tab, kick off the load.
+    // eslint-disable-next-line func-names
+    'data.id': function (newId) {
+      if (newId && this.activeTab === 'sendlog') {
+        this.onSendLogDatePreset();
+      }
+    },
   },
 
   mounted() {
