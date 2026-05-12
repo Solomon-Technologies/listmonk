@@ -34,6 +34,11 @@ type Subscriber struct {
 	Attribs JSON           `db:"attribs" json:"attribs"`
 	Status  string         `db:"status" json:"status"`
 	Lists   types.JSONText `db:"lists" json:"lists"`
+	// CompanyID is the tenant the subscriber belongs to. Default 0 means
+	// "use whatever the auth context provides at insert time" — the Core
+	// InsertSubscriber resolves a 0 to the authed user's CompanyID. Subscribers
+	// loaded back from the DB always carry their concrete tenant value here.
+	CompanyID int `db:"company_id" json:"company_id"`
 }
 
 type subLists struct {
