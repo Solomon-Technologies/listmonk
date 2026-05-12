@@ -870,7 +870,8 @@ func canEditCampaign(status string) bool {
 
 // GetCampaignSendLog returns paginated send records for the campaign.
 // Query params: per_page (default 50, max 500), page (default 1),
-// email (substring filter), status ('' | 'sent' | 'failed').
+// email (substring filter), status ('' | 'sent' | 'failed'),
+// from / to (ISO-8601 timestamps, optional date-range filter).
 // Solomon fork — powers the Campaign > Send Log UI tab.
 func (a *App) GetCampaignSendLog(c echo.Context) error {
 	id := getID(c)
@@ -893,21 +894,42 @@ func (a *App) GetCampaignSendLog(c echo.Context) error {
 	if status != "" && status != "sent" && status != "failed" {
 		status = ""
 	}
+	from := parseQueryTime(c.QueryParam("from"))
+	to := parseQueryTime(c.QueryParam("to"))
 
-	rows, total, err := a.core.QueryCampaignSendLog(id, email, status, perPage, offset)
+	rows, total, err := a.core.QueryCampaignSendLog(id, email, status, from, to, perPage, offset)
 	if err != nil {
 		return err
 	}
 
 	return c.JSON(http.StatusOK, okResp{struct {
-		Results  []models.CampaignSendLogEntry `json:"results"`
-		Total    int                           `json:"total"`
-		Page     int                           `json:"page"`
-		PerPage  int                           `json:"per_page"`
+		Results []models.CampaignSendLogEntry `json:"results"`
+		Total   int                           `json:"total"`
+		Page    int                           `json:"page"`
+		PerPage int                           `json:"per_page"`
 	}{rows, total, page, perPage}})
 }
 
+// parseQueryTime accepts an ISO-8601 string (RFC3339) and returns the parsed
+// time.Time, or a zero time on empty / invalid input. The caller treats zero
+// as "no bound."
+func parseQueryTime(s string) time.Time {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
 // GetCampaignSendLogStats returns aggregate send-log counts for the campaign.
+// Honors the same `from` / `to` ISO-8601 query params as the paginated send-log
+// endpoint so the operator's date filter changes the header counters too.
+// The Dashboard Campaign Health tile uses ?from=<startOfToday> and
+// ?from=<7daysAgo> to populate the Today / 7d columns.
 func (a *App) GetCampaignSendLogStats(c echo.Context) error {
 	id := getID(c)
 
@@ -915,7 +937,10 @@ func (a *App) GetCampaignSendLogStats(c echo.Context) error {
 		return err
 	}
 
-	stats, err := a.core.QueryCampaignSendLogStats(id)
+	from := parseQueryTime(c.QueryParam("from"))
+	to := parseQueryTime(c.QueryParam("to"))
+
+	stats, err := a.core.QueryCampaignSendLogStats(id, from, to)
 	if err != nil {
 		return err
 	}
