@@ -320,8 +320,9 @@ func (c *Core) InsertSubscriber(sub models.Subscriber, listIDs []int, listUUIDs 
 		sub.Attribs,
 		pq.Array(listIDs),
 		pq.Array(listUUIDs),
-		subStatus); err != nil {
-		if pqErr, ok := err.(*pq.Error); ok && pqErr.Constraint == "subscribers_email_key" {
+		subStatus,
+		sub.CompanyID); err != nil {
+		if pqErr, ok := err.(*pq.Error); ok && (pqErr.Constraint == "subscribers_email_key" || pqErr.Constraint == "idx_subs_email_company") {
 			return models.Subscriber{}, false, echo.NewHTTPError(http.StatusConflict, c.i18n.T("subscribers.emailExists"))
 		} else {
 			// return sub.Subscriber, errSubscriberExists

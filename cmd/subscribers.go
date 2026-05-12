@@ -240,6 +240,12 @@ func (a *App) CreateSubscriber(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, a.i18n.Ts("globals.messages.permissionDenied", "name", "lists"))
 	}
 
+	// Tenant-scope the new subscriber to the authenticated user's company.
+	// Without this the INSERT defaults to company_id=1 and collides on the
+	// composite (lower(email), company_id) unique index when the email
+	// already exists under a different tenant.
+	req.Subscriber.CompanyID = user.CompanyID
+
 	// Insert the subscriber into the DB.
 	sub, _, err := a.core.InsertSubscriber(req.Subscriber, listIDs, nil, req.PreconfirmSubs, false)
 	if err != nil {

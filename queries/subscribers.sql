@@ -86,9 +86,15 @@ SELECT lists.*,
     ORDER BY subscriber_lists.status;
 
 -- name: insert-subscriber
+-- $9 is the tenant company_id. The Go side resolves it from the auth context
+-- (handler) or from the target list (public optin). Without this, every
+-- subscriber inserted falls back to the column default (company_id=1) and
+-- collides with the (lower(email), company_id) composite unique index when
+-- a different tenant tries to add an email that the company_id=1 tenant
+-- already owns.
 WITH sub AS (
-    INSERT INTO subscribers (uuid, email, name, status, attribs)
-    VALUES($1, $2, $3, $4, $5)
+    INSERT INTO subscribers (uuid, email, name, status, attribs, company_id)
+    VALUES($1, $2, $3, $4, $5, $9)
     RETURNING id, status
 ),
 listIDs AS (
