@@ -420,6 +420,12 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 }
 
 // AdminPage is the root handler that renders the Javascript admin frontend.
+// The HTML page references hashed Vite chunk filenames (e.g. Campaign-XXX.js),
+// so a stale cached HTML keeps pointing the browser at chunk hashes that no
+// longer exist after a deploy — operator sees a half-old / half-new SPA.
+// Cache-Control: no-store on the HTML forces the browser to re-fetch the
+// shell on every load and pick up the latest chunk hashes. The chunks
+// themselves stay long-cacheable (content-addressed names).
 func (a *App) AdminPage(c echo.Context) error {
 	b, err := a.fs.Read(path.Join(uriAdmin, "/index.html"))
 	if err != nil {
@@ -428,6 +434,9 @@ func (a *App) AdminPage(c echo.Context) error {
 
 	b = bytes.ReplaceAll(b, []byte("asset_version"), []byte(a.cfg.AssetVersion))
 
+	c.Response().Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+	c.Response().Header().Set("Pragma", "no-cache")
+	c.Response().Header().Set("Expires", "0")
 	return c.HTMLBlob(http.StatusOK, b)
 }
 
