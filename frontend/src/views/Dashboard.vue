@@ -418,7 +418,7 @@ export default Vue.extend({
           }));
 
           // Fetch send-rate map (one call covers all running campaigns).
-          this.$api.getRunningCampaignStats().then((statsRes) => {
+          this.$api.getCampaignStats().then((statsRes) => {
             const list = (statsRes && Array.isArray(statsRes) ? statsRes : (statsRes.results || statsRes || [])) || [];
             const rateById = {};
             list.forEach((s) => { rateById[s.id] = s.sendRate || 0; });
