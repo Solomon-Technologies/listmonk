@@ -404,16 +404,8 @@ export const getCampaignSendLogStats = async (id, params) => http.get(
   { params },
 );
 
-// Solomon fork: list campaigns + per-running-campaign stats for the Dashboard
-// Campaign Health tile. Same `this.$api.http.get` typo bug as above.
-export const getCampaigns = async (params) => http.get(
-  '/api/campaigns',
-  { params },
-);
-
-export const getRunningCampaignStats = async () => http.get(
-  '/api/campaigns/running/stats',
-);
+// (getCampaigns + getCampaignStats already declared above for the Campaigns
+// list view. Dashboard.vue's loadHealth reuses those — no duplicates here.)
 
 export const deleteCampaign = async (id) => http.delete(
   `/api/campaigns/${id}`,
