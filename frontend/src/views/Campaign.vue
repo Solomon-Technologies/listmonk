@@ -612,23 +612,23 @@ export default Vue.extend({
     },
 
     // Send Log tab — Solomon fork.
-    // The shared $api.http response interceptor (frontend/src/api/index.js:29-66)
-    // unwraps resp.data.data and camelCases the keys before resolving. So `res`
-    // here is the inner payload (results/total/perPage), not the raw axios
-    // response object. Earlier versions of these methods read res.data.data.*
-    // and snake_case fields, which silently produced empty rows.
+    // Use the proper $api exports (which wrap the module-local axios client).
+    // Earlier versions called `this.$api.http.get(...)`, but `http` was never
+    // exposed under $api — so every call threw "Cannot read properties of
+    // undefined (reading 'get')", was swallowed by .catch, and the table
+    // stayed empty regardless of filter, refresh, or browser. Whole bug.
     loadSendLog() {
       if (!this.data.id) return;
       this.sendLogLoading = true;
-      const params = new URLSearchParams({
+      const params = {
         per_page: this.sendLogPerPage,
         page: this.sendLogPage,
-      });
-      if (this.sendLogEmailFilter) params.set('email', this.sendLogEmailFilter);
-      if (this.sendLogStatusFilter) params.set('status', this.sendLogStatusFilter);
-      if (this.sendLogFromIso) params.set('from', this.sendLogFromIso);
-      if (this.sendLogToIso) params.set('to', this.sendLogToIso);
-      this.$api.http.get(`/api/campaigns/${this.data.id}/send-log?${params.toString()}`)
+      };
+      if (this.sendLogEmailFilter) params.email = this.sendLogEmailFilter;
+      if (this.sendLogStatusFilter) params.status = this.sendLogStatusFilter;
+      if (this.sendLogFromIso) params.from = this.sendLogFromIso;
+      if (this.sendLogToIso) params.to = this.sendLogToIso;
+      this.$api.getCampaignSendLog(this.data.id, params)
         .then((res) => {
           this.sendLogRows = res.results || [];
           this.sendLogTotal = res.total || 0;
@@ -641,12 +641,10 @@ export default Vue.extend({
 
     loadSendLogStats() {
       if (!this.data.id) return;
-      const params = new URLSearchParams();
-      if (this.sendLogFromIso) params.set('from', this.sendLogFromIso);
-      if (this.sendLogToIso) params.set('to', this.sendLogToIso);
-      const qs = params.toString();
-      const url = `/api/campaigns/${this.data.id}/send-log/stats${qs ? `?${qs}` : ''}`;
-      this.$api.http.get(url)
+      const params = {};
+      if (this.sendLogFromIso) params.from = this.sendLogFromIso;
+      if (this.sendLogToIso) params.to = this.sendLogToIso;
+      this.$api.getCampaignSendLogStats(this.data.id, params)
         .then((res) => {
           this.sendLogStats = res || null;
         })

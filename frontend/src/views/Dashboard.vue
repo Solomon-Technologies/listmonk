@@ -390,11 +390,11 @@ export default Vue.extend({
     // pull the send-log stats (last_sent_at) and the live send-rate, compute
     // stalled/idle flags, sort STALLED first so the operator sees the problem.
     loadHealth() {
-      // The shared $api.http response interceptor already unwraps resp.data.data
-      // and camelCases keys, so `res` here is the inner payload directly with
-      // camelCase fields (toSend, lastSentAt, sendRate). Earlier versions read
-      // res.data.data.* and snake_case which silently produced empty rows.
-      this.$api.http.get('/api/campaigns?per_page=100')
+      // Use proper $api exports (which wrap the module-local axios client).
+      // Earlier versions called `this.$api.http.get(...)` directly, but `http`
+      // was never exposed under $api — every call threw TypeError, was
+      // silently caught, and the Health tile stayed hidden.
+      this.$api.getCampaigns({ per_page: 100 })
         .then((res) => {
           const all = (res && res.results) || [];
           const running = all.filter((c) => c.status === 'running');
@@ -418,7 +418,7 @@ export default Vue.extend({
           }));
 
           // Fetch send-rate map (one call covers all running campaigns).
-          this.$api.http.get('/api/campaigns/running/stats').then((statsRes) => {
+          this.$api.getRunningCampaignStats().then((statsRes) => {
             const list = (statsRes && Array.isArray(statsRes) ? statsRes : (statsRes.results || statsRes || [])) || [];
             const rateById = {};
             list.forEach((s) => { rateById[s.id] = s.sendRate || 0; });
@@ -434,9 +434,9 @@ export default Vue.extend({
           const todayIso = startOfToday.toISOString();
           const sevenIso = sevenDaysAgo.toISOString();
           Promise.all(rows.map((row, i) => Promise.all([
-            this.$api.http.get(`/api/campaigns/${row.id}/send-log/stats`).catch(() => null),
-            this.$api.http.get(`/api/campaigns/${row.id}/send-log/stats?from=${encodeURIComponent(todayIso)}`).catch(() => null),
-            this.$api.http.get(`/api/campaigns/${row.id}/send-log/stats?from=${encodeURIComponent(sevenIso)}`).catch(() => null),
+            this.$api.getCampaignSendLogStats(row.id, {}).catch(() => null),
+            this.$api.getCampaignSendLogStats(row.id, { from: todayIso }).catch(() => null),
+            this.$api.getCampaignSendLogStats(row.id, { from: sevenIso }).catch(() => null),
           ]).then(([sr, today, week]) => {
             const stats = sr || {};
             const lastSentAt = stats.lastSentAt || null;

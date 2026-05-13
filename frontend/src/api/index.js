@@ -387,6 +387,34 @@ export const retryFailedCampaignSends = async (id) => http.post(
   { loading: models.campaigns },
 );
 
+// Solomon fork: paginated per-recipient send log. Backs the Campaign > Send Log
+// UI tab. Earlier versions of Campaign.vue called `this.$api.http.get(...)`
+// directly, but `http` is a module-local axios client — never exposed under
+// $api — so every call threw TypeError, was silently caught, and the table
+// stayed empty no matter what filter the operator picked. Routing through a
+// proper exported function fixes that and keeps the response-interceptor
+// (unwrap + camelCase) flowing.
+export const getCampaignSendLog = async (id, params) => http.get(
+  `/api/campaigns/${id}/send-log`,
+  { params },
+);
+
+export const getCampaignSendLogStats = async (id, params) => http.get(
+  `/api/campaigns/${id}/send-log/stats`,
+  { params },
+);
+
+// Solomon fork: list campaigns + per-running-campaign stats for the Dashboard
+// Campaign Health tile. Same `this.$api.http.get` typo bug as above.
+export const getCampaigns = async (params) => http.get(
+  '/api/campaigns',
+  { params },
+);
+
+export const getRunningCampaignStats = async () => http.get(
+  '/api/campaigns/running/stats',
+);
+
 export const deleteCampaign = async (id) => http.delete(
   `/api/campaigns/${id}`,
   { loading: models.campaigns },
