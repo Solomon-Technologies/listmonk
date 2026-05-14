@@ -1,12 +1,75 @@
 <template>
   <section class="dashboard content">
-    <header class="columns">
-      <div class="column is-two-thirds">
-        <h1 class="title is-5">
+    <header class="columns is-vcentered mb-2">
+      <div class="column is-narrow">
+        <h1 class="title is-5 mb-0">
           {{ $utils.niceDate(new Date()) }}
         </h1>
       </div>
+      <div class="column">
+        <!-- Solomon fork: date-range filter. Drives the four window-aware
+             metric tiles, the Campaign Health "Sent" column, the Views/Clicks
+             charts, and is passed via URL query params on every click-through
+             so the destination page (CampaignAnalytics, Send Log) opens with
+             the same filter pre-applied. -->
+        <div class="buttons has-addons mb-0" data-cy="dashboard-date-presets">
+          <b-button size="is-small" :type="dateRange.preset === 'today' ? 'is-primary' : 'is-light'"
+            @click="applyPreset('today')">Today</b-button>
+          <b-button size="is-small" :type="dateRange.preset === '7d' ? 'is-primary' : 'is-light'"
+            @click="applyPreset('7d')">7d</b-button>
+          <b-button size="is-small" :type="dateRange.preset === '15d' ? 'is-primary' : 'is-light'"
+            @click="applyPreset('15d')">15d</b-button>
+          <b-button size="is-small" :type="dateRange.preset === '30d' ? 'is-primary' : 'is-light'"
+            @click="applyPreset('30d')">30d</b-button>
+          <b-button size="is-small" :type="dateRange.preset === 'custom' ? 'is-primary' : 'is-light'"
+            @click="applyPreset('custom')">Custom</b-button>
+        </div>
+        <div v-if="dateRange.preset === 'custom'" class="columns is-mobile mt-1">
+          <div class="column is-narrow">
+            <b-datepicker v-model="dateRange.from" placeholder="From"
+              icon="calendar-today" size="is-small" :max-date="dateRange.to || new Date()"
+              @input="refreshWindow" />
+          </div>
+          <div class="column is-narrow">
+            <b-datepicker v-model="dateRange.to" placeholder="To (optional)"
+              icon="calendar-today" size="is-small" :min-date="dateRange.from"
+              :max-date="new Date()" @input="refreshWindow" />
+          </div>
+        </div>
+      </div>
     </header>
+
+    <!-- Solomon fork: four window-bound metric tiles summed across all
+         running campaigns for the chosen date filter. Click the arrow icon
+         to drill into Campaign Analytics with the same range pre-applied. -->
+    <section class="wrap">
+      <div class="tile is-ancestor">
+        <div class="tile is-vertical is-12">
+          <div class="tile">
+            <div class="tile is-parent relative" v-for="m in metricTiles" :key="m.key">
+              <b-loading v-if="isMetricsLoading" active :is-full-page="false" />
+              <article class="tile is-child notification" :data-cy="`metric-${m.key}`">
+                <div class="columns is-mobile is-vcentered">
+                  <div class="column">
+                    <p class="title is-3 mb-0">
+                      <b-icon :icon="m.icon" />
+                      {{ m.value.toLocaleString() }}
+                    </p>
+                    <p class="is-size-7 has-text-grey mt-1">
+                      {{ m.label }} <span class="has-text-weight-semibold">({{ windowLabel }})</span>
+                    </p>
+                  </div>
+                  <div class="column is-narrow">
+                    <b-button size="is-small" type="is-light" icon-right="arrow-top-right"
+                      @click="goToAnalytics" :title="`Open Campaign Analytics for ${m.label}`" />
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <section class="counts wrap">
       <div class="tile is-ancestor">
@@ -273,11 +336,8 @@
                 <b-table-column field="sent" label="Sent / Queued" v-slot="props">
                   {{ props.row.sent.toLocaleString() }} / {{ (props.row.toSend || 0).toLocaleString() }}
                 </b-table-column>
-                <b-table-column field="sentToday" label="Today" v-slot="props" width="80">
-                  <strong>{{ (props.row.sentToday || 0).toLocaleString() }}</strong>
-                </b-table-column>
-                <b-table-column field="sent7d" label="7d" v-slot="props" width="80">
-                  {{ (props.row.sent7d || 0).toLocaleString() }}
+                <b-table-column field="sentInWindow" :label="`Sent (${windowLabel})`" v-slot="props" width="120">
+                  <strong>{{ (props.row.sentInWindow || 0).toLocaleString() }}</strong>
                 </b-table-column>
                 <b-table-column field="lastSentAt" label="Last send" v-slot="props">
                   <span v-if="props.row.lastSentAt" :class="{ 'has-text-danger': props.row.stalled }">
@@ -287,6 +347,11 @@
                 </b-table-column>
                 <b-table-column field="rate" label="Send rate" v-slot="props">
                   <span class="has-text-grey">{{ props.row.sendRate || 0 }}/min</span>
+                </b-table-column>
+                <b-table-column label="" v-slot="props" width="60">
+                  <b-button size="is-small" type="is-light" icon-right="arrow-top-right"
+                    @click="goToCampaignSendLog(props.row.id)"
+                    :title="`Open ${props.row.name} Send Log for ${windowLabel}`" />
                 </b-table-column>
               </b-table>
               <p v-if="anyStalled" class="mt-3 is-size-7 has-text-grey">
@@ -302,15 +367,25 @@
             <article class="tile is-child notification charts">
               <div class="columns">
                 <div class="column is-6">
-                  <h3 class="title is-size-6">
-                    {{ $t('dashboard.campaignViews') }}
-                  </h3><br />
+                  <div class="is-flex is-justify-content-space-between is-align-items-center">
+                    <h3 class="title is-size-6 mb-0">
+                      {{ $t('dashboard.campaignViews') }} <span class="has-text-grey is-size-7">({{ windowLabel }})</span>
+                    </h3>
+                    <b-button size="is-small" type="is-light" icon-right="arrow-top-right"
+                      @click="goToAnalytics" title="Open in Campaign Analytics" />
+                  </div>
+                  <br />
                   <chart type="line" v-if="campaignViews" :data="campaignViews" />
                 </div>
                 <div class="column is-6">
-                  <h3 class="title is-size-6 has-text-right">
-                    {{ $t('dashboard.linkClicks') }}
-                  </h3><br />
+                  <div class="is-flex is-justify-content-space-between is-align-items-center">
+                    <h3 class="title is-size-6 mb-0">
+                      {{ $t('dashboard.linkClicks') }} <span class="has-text-grey is-size-7">({{ windowLabel }})</span>
+                    </h3>
+                    <b-button size="is-small" type="is-light" icon-right="arrow-top-right"
+                      @click="goToAnalytics" title="Open in Campaign Analytics" />
+                  </div>
+                  <br />
                   <chart type="line" v-if="campaignClicks" :data="campaignClicks" />
                 </div>
               </div>
@@ -346,6 +421,7 @@ export default Vue.extend({
       isChartsLoading: true,
       isCountsLoading: true,
       isFeaturesLoading: true,
+      isMetricsLoading: false,
       campaignViews: null,
       campaignClicks: null,
       counts: {
@@ -358,23 +434,152 @@ export default Vue.extend({
       // Solomon fork: per-campaign health rows for the dashboard widget.
       // Each: { id, name, sent, to_send, last_sent_at, send_rate, stalled, idle }
       health: [],
+
+      // Solomon fork: dashboard-wide date filter. Drives the four
+      // window-aware metric tiles, the Campaign Health "Sent" column, the
+      // Views/Clicks charts, and is passed through as URL query params on
+      // every click-through to a deeper analytics page.
+      dateRange: {
+        preset: 'today',
+        from: null,
+        to: null,
+      },
+      // The four window-aware metric tiles. Each is the sum across all
+      // currently-running campaigns for the chosen window.
+      metrics: {
+        sent: 0,
+        opened: 0,
+        clicked: 0,
+        bounced: 0,
+      },
     };
   },
 
   methods: {
+    // Solomon fork: pick a date-range preset and recompute from/to.
+    // Re-fires every date-sensitive load (metrics, health, charts).
+    applyPreset(preset) {
+      const now = new Date();
+      const startOfDay = (d) => {
+        const x = new Date(d);
+        x.setHours(0, 0, 0, 0);
+        return x;
+      };
+      let from = null;
+      let to = null;
+      switch (preset) {
+        case 'today':
+          from = startOfDay(now);
+          break;
+        case '7d':
+          from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '15d':
+          from = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
+          break;
+        case '30d':
+          from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case 'custom':
+          // Keep existing from/to if already set, else default to last 7 days.
+          if (!this.dateRange.from) from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          else from = this.dateRange.from;
+          if (this.dateRange.to) to = this.dateRange.to;
+          break;
+        default:
+          from = startOfDay(now);
+          break;
+      }
+      this.dateRange = { preset, from, to };
+      this.refreshWindow();
+    },
+
+    // Refetch every dashboard surface that depends on the date range.
+    refreshWindow() {
+      this.loadMetrics();
+      this.loadCharts();
+      this.loadHealth();
+    },
+
+    // Pull window-bound counters across all running campaigns.
+    loadMetrics() {
+      this.isMetricsLoading = true;
+      this.$api.getCampaigns({ per_page: 100 }).then((res) => {
+        const all = (res && res.results) || [];
+        const ids = all.filter((c) => c.status === 'running').map((c) => c.id);
+        if (ids.length === 0) {
+          this.metrics = { sent: 0, opened: 0, clicked: 0, bounced: 0 };
+          this.isMetricsLoading = false;
+          return;
+        }
+        const fromIso = this.rangeIso.from;
+        const toIso = this.rangeIso.to;
+        // Sent: sum totalSent from per-campaign send-log stats.
+        const sentP = Promise.all(ids.map((id) => this.$api
+          .getCampaignSendLogStats(id, this.statsParams)
+          .catch(() => null))).then((rows) => rows.reduce((s, r) => s + ((r && r.totalSent) || 0), 0));
+        // Opens / Clicks / Bounces: one call each, summed across campaigns.
+        const params = { id: ids, from: fromIso || undefined, to: toIso || undefined };
+        const sumCount = (data) => (Array.isArray(data) ? data.reduce((s, d) => s + (d.count || 0), 0) : 0);
+        const opensP = this.$api.getCampaignViewCounts(params).then(sumCount).catch(() => 0);
+        const clicksP = this.$api.getCampaignClickCounts(params).then(sumCount).catch(() => 0);
+        const bouncesP = this.$api.getCampaignBounceCounts(params).then(sumCount).catch(() => 0);
+        Promise.all([sentP, opensP, clicksP, bouncesP]).then(([sent, opened, clicked, bounced]) => {
+          this.metrics = { sent, opened, clicked, bounced };
+          this.isMetricsLoading = false;
+        });
+      }).catch(() => { this.isMetricsLoading = false; });
+    },
+
+    // Re-pull the Views / Clicks charts using the date-aware analytics
+    // endpoints (the legacy /api/dashboard/charts is hardcoded to 30 days).
+    loadCharts() {
+      this.isChartsLoading = true;
+      this.$api.getCampaigns({ per_page: 100 }).then((res) => {
+        const all = (res && res.results) || [];
+        const ids = all.filter((c) => c.status === 'running').map((c) => c.id);
+        if (ids.length === 0) {
+          this.campaignViews = {};
+          this.campaignClicks = {};
+          this.isChartsLoading = false;
+          return;
+        }
+        const params = { id: ids, from: this.rangeIso.from || undefined, to: this.rangeIso.to || undefined };
+        Promise.all([
+          this.$api.getCampaignViewCounts(params).catch(() => []),
+          this.$api.getCampaignClickCounts(params).catch(() => []),
+        ]).then(([views, clicks]) => {
+          this.campaignViews = this.makeChart((views || []).map((d) => ({ date: d.timestamp, count: d.count })));
+          this.campaignClicks = this.makeChart((clicks || []).map((d) => ({ date: d.timestamp, count: d.count })));
+          this.isChartsLoading = false;
+        });
+      }).catch(() => { this.isChartsLoading = false; });
+    },
+
+    // Click-through helpers. Both encode the active date range so the
+    // destination page applies the same filter without manual clicks.
+    goToAnalytics() {
+      const ids = this.health.map((c) => c.id);
+      const query = {};
+      if (ids.length) query.id = ids.join(',');
+      if (this.rangeUnix.from) query.from = this.rangeUnix.from;
+      if (this.rangeUnix.to) query.to = this.rangeUnix.to;
+      this.$router.push({ name: 'campaignAnalytics', query });
+    },
+    goToCampaignSendLog(id) {
+      const query = { preset: this.dateRange.preset };
+      if (this.rangeIso.from) query.from = this.rangeIso.from;
+      if (this.rangeIso.to) query.to = this.rangeIso.to;
+      this.$router.push({ name: 'campaign', params: { id }, query, hash: '#sendlog' });
+    },
+
     fetchData() {
       this.isCountsLoading = true;
-      this.isChartsLoading = true;
 
+      // Lifetime aggregates (entity counts, not date-bound).
       this.$api.getDashboardCounts().then((data) => {
         this.counts = data;
         this.isCountsLoading = false;
-      });
-
-      this.$api.getDashboardCharts().then((data) => {
-        this.isChartsLoading = false;
-        this.campaignViews = this.makeChart(data.campaignViews);
-        this.campaignClicks = this.makeChart(data.linkClicks);
       });
 
       this.isFeaturesLoading = true;
@@ -383,7 +588,9 @@ export default Vue.extend({
         this.isFeaturesLoading = false;
       });
 
-      this.loadHealth();
+      // Date-aware tiles, charts, Campaign Health — all driven by the
+      // current dateRange preset (defaults to 'today' on first load).
+      this.applyPreset(this.dateRange.preset || 'today');
     },
 
     // Solomon fork: build the Campaign Health rows. For every running campaign,
@@ -425,19 +632,17 @@ export default Vue.extend({
             rows.forEach((_, i) => { rows[i] = { ...rows[i], sendRate: rateById[rows[i].id] || 0 }; });
           }).catch(() => { /* non-fatal */ });
 
-          // Fetch lifetime stats + today + 7-day stats per campaign in parallel.
+          // Fetch lifetime stats (for last_sent_at + stalled flag) and
+          // window-bound stats (for the new "Sent (window)" column) per
+          // campaign in parallel. The window mirrors the dashboard's
+          // dateRange filter — operator changes the preset, this column
+          // updates automatically.
           const STALL_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
           const now = new Date();
-          const startOfToday = new Date(now);
-          startOfToday.setHours(0, 0, 0, 0);
-          const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          const todayIso = startOfToday.toISOString();
-          const sevenIso = sevenDaysAgo.toISOString();
           Promise.all(rows.map((row, i) => Promise.all([
             this.$api.getCampaignSendLogStats(row.id, {}).catch(() => null),
-            this.$api.getCampaignSendLogStats(row.id, { from: todayIso }).catch(() => null),
-            this.$api.getCampaignSendLogStats(row.id, { from: sevenIso }).catch(() => null),
-          ]).then(([sr, today, week]) => {
+            this.$api.getCampaignSendLogStats(row.id, this.statsParams).catch(() => null),
+          ]).then(([sr, win]) => {
             const stats = sr || {};
             const lastSentAt = stats.lastSentAt || null;
             const stalled = lastSentAt
@@ -449,8 +654,7 @@ export default Vue.extend({
               lastSentAt,
               stalled,
               idle,
-              sentToday: (today && today.totalSent) || 0,
-              sent7d: (week && week.totalSent) || 0,
+              sentInWindow: (win && win.totalSent) || 0,
             };
           }))).then(() => {
             // Stalled rows first, then idle, then sending.
@@ -497,6 +701,49 @@ export default Vue.extend({
     },
     anyStalled() {
       return this.stalledCount > 0;
+    },
+    // Solomon fork: filter range converted to the formats different
+    // downstream surfaces want. Send Log + send-log/stats want ISO-8601;
+    // CampaignAnalytics wants Unix seconds; both want raw Date for the
+    // datepicker.
+    rangeIso() {
+      return {
+        from: this.dateRange.from ? this.dateRange.from.toISOString() : '',
+        to: this.dateRange.to ? this.dateRange.to.toISOString() : '',
+      };
+    },
+    rangeUnix() {
+      return {
+        from: this.dateRange.from ? Math.floor(this.dateRange.from.getTime() / 1000) : null,
+        to: this.dateRange.to ? Math.floor(this.dateRange.to.getTime() / 1000) : null,
+      };
+    },
+    // Reusable params object for getCampaignSendLogStats / getCampaign*Counts.
+    statsParams() {
+      const p = {};
+      if (this.rangeIso.from) p.from = this.rangeIso.from;
+      if (this.rangeIso.to) p.to = this.rangeIso.to;
+      return p;
+    },
+    // Friendly label for the "Sent (window)" column header in the Health tile.
+    windowLabel() {
+      switch (this.dateRange.preset) {
+        case 'today': return 'Today';
+        case '7d': return 'Last 7d';
+        case '15d': return 'Last 15d';
+        case '30d': return 'Last 30d';
+        case 'custom': return 'Custom';
+        default: return 'Window';
+      }
+    },
+    // The four metric tiles rendered above the lifetime aggregates.
+    metricTiles() {
+      return [
+        { key: 'sent', label: 'Sent', icon: 'email-fast-outline', value: this.metrics.sent || 0 },
+        { key: 'opened', label: 'Opened', icon: 'email-open-outline', value: this.metrics.opened || 0 },
+        { key: 'clicked', label: 'Clicked', icon: 'cursor-default-click-outline', value: this.metrics.clicked || 0 },
+        { key: 'bounced', label: 'Bounced', icon: 'email-alert-outline', value: this.metrics.bounced || 0 },
+      ];
     },
   },
 

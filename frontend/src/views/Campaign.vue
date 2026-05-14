@@ -388,8 +388,10 @@
                 <option value="yesterday">Yesterday</option>
                 <option value="24h">Last 24 hours</option>
                 <option value="7d">Last 7 days</option>
+                <option value="15d">Last 15 days</option>
                 <option value="30d">Last 30 days</option>
                 <option value="all">All time</option>
+                <option value="custom">Custom (from URL)</option>
               </b-select>
             </div>
             <div class="column is-one-quarter">
@@ -678,6 +680,13 @@ export default Vue.extend({
     // they see in their browser); the API stores in UTC so we send ISO-8601
     // including the local TZ offset and Postgres handles the conversion.
     onSendLogDatePreset() {
+      // 'custom' preserves whatever from/to was supplied (e.g. from URL query
+      // params on click-through from Dashboard). Every other preset
+      // recomputes from/to from now.
+      if (this.sendLogDatePreset === 'custom') {
+        this.onSendLogReload();
+        return;
+      }
       const now = new Date();
       const startOfDay = (d) => {
         const x = new Date(d);
@@ -702,6 +711,9 @@ export default Vue.extend({
           break;
         case '7d':
           from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '15d':
+          from = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
           break;
         case '30d':
           from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -1128,6 +1140,29 @@ export default Vue.extend({
 
   mounted() {
     window.onbeforeunload = () => this.isUnsaved() || null;
+
+    // Solomon fork: hydrate the Send Log date filter from URL query params if
+    // present (e.g. arriving from a Dashboard click-through with the chosen
+    // window already encoded). Recognizes ?preset=today|yesterday|24h|7d|15d|
+    // 30d|all OR explicit ?from=<iso>&to=<iso>. Sets the data fields BEFORE
+    // the activeTab/data.id watchers fire onSendLogDatePreset, so the first
+    // load uses the URL-provided window instead of defaulting to 'today'.
+    const VALID_PRESETS = ['today', 'yesterday', '24h', '7d', '15d', '30d', 'all', 'custom'];
+    const qp = this.$route.query.preset;
+    if (typeof qp === 'string' && VALID_PRESETS.includes(qp)) {
+      this.sendLogDatePreset = qp;
+    }
+    const qFrom = this.$route.query.from;
+    const qTo = this.$route.query.to;
+    if (typeof qFrom === 'string' && qFrom && !Number.isNaN(Date.parse(qFrom))) {
+      this.sendLogFromIso = qFrom;
+      // Explicit from/to overrides the preset compute — onSendLogDatePreset
+      // skips re-computing when preset is 'custom'.
+      if (this.sendLogDatePreset !== 'custom') this.sendLogDatePreset = 'custom';
+    }
+    if (typeof qTo === 'string' && qTo && !Number.isNaN(Date.parse(qTo))) {
+      this.sendLogToIso = qTo;
+    }
 
     // Fill default form fields.
     this.form.fromEmail = this.serverConfig.from_email;
