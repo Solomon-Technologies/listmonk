@@ -39,37 +39,6 @@
       </div>
     </header>
 
-    <!-- Solomon fork: four window-bound metric tiles summed across all
-         running campaigns for the chosen date filter. Click the arrow icon
-         to drill into Campaign Analytics with the same range pre-applied. -->
-    <section class="wrap">
-      <div class="tile is-ancestor">
-        <div class="tile is-vertical is-12">
-          <div class="tile">
-            <div class="tile is-parent relative" v-for="m in metricTiles" :key="m.key">
-              <b-loading v-if="isMetricsLoading" active :is-full-page="false" />
-              <article class="tile is-child notification" :data-cy="`metric-${m.key}`">
-                <div class="columns is-mobile is-vcentered">
-                  <div class="column">
-                    <p class="title is-3 mb-0">
-                      <b-icon :icon="m.icon" />
-                      {{ m.value.toLocaleString() }}
-                    </p>
-                    <p class="is-size-7 has-text-grey mt-1">
-                      {{ m.label }} <span class="has-text-weight-semibold">({{ windowLabel }})</span>
-                    </p>
-                  </div>
-                  <div class="column is-narrow">
-                    <b-button size="is-small" type="is-light" icon-right="arrow-top-right"
-                      @click="goToAnalytics" :title="`Open Campaign Analytics for ${m.label}`" />
-                  </div>
-                </div>
-              </article>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
 
     <section class="counts wrap">
       <div class="tile is-ancestor">
@@ -109,6 +78,8 @@
                     </ul>
                   </div>
                 </div>
+                <router-link :to="{ name: 'lists' }" class="is-size-7"
+                  title="Open Lists">View all lists &rarr;</router-link>
               </article><!-- lists -->
 
               <article class="tile is-child notification" data-cy="campaigns">
@@ -134,6 +105,8 @@
                     </ul>
                   </div>
                 </div>
+                <router-link :to="{ name: 'campaigns' }" class="is-size-7"
+                  title="Open Campaigns">View all campaigns &rarr;</router-link>
               </article><!-- campaigns -->
             </div><!-- block -->
 
@@ -164,6 +137,8 @@
                     </ul>
                   </div><!-- subscriber breakdown -->
                 </div><!-- subscriber columns -->
+                <router-link :to="{ name: 'subscribers' }" class="is-size-7"
+                  title="Open Subscribers">View all subscribers &rarr;</router-link>
                 <hr />
                 <div class="columns" data-cy="messages">
                   <div class="column is-12">
@@ -173,6 +148,19 @@
                     </p>
                     <p class="is-size-6 has-text-grey">
                       {{ $t('dashboard.messagesSent') }}
+                    </p>
+                    <!-- Solomon fork: window-aware sub-line. Sums totalSent
+                         across all running campaigns for the date filter
+                         currently selected at the top of the dashboard. -->
+                    <p class="is-size-6 mt-2">
+                      <strong class="has-text-success">
+                        {{ $utils.niceNumber(sentInWindow) }}
+                      </strong>
+                      <span class="has-text-grey">sent in {{ windowLabel }}</span>
+                      <a class="is-size-7 ml-2" @click.prevent="goToAnalytics"
+                        href="#" title="Open Campaign Analytics for this window">
+                        analytics &rarr;
+                      </a>
                     </p>
                   </div>
                 </div>
@@ -369,10 +357,11 @@
                 <div class="column is-6">
                   <div class="is-flex is-justify-content-space-between is-align-items-center">
                     <h3 class="title is-size-6 mb-0">
-                      {{ $t('dashboard.campaignViews') }} <span class="has-text-grey is-size-7">({{ windowLabel }})</span>
+                      {{ $t('dashboard.campaignViews') }}
+                      <span class="has-text-grey is-size-7">(last 30 days)</span>
                     </h3>
                     <b-button size="is-small" type="is-light" icon-right="arrow-top-right"
-                      @click="goToAnalytics" title="Open in Campaign Analytics" />
+                      @click="goToAnalytics" :title="`Open in Campaign Analytics (${windowLabel})`" />
                   </div>
                   <br />
                   <chart type="line" v-if="campaignViews" :data="campaignViews" />
@@ -380,10 +369,11 @@
                 <div class="column is-6">
                   <div class="is-flex is-justify-content-space-between is-align-items-center">
                     <h3 class="title is-size-6 mb-0">
-                      {{ $t('dashboard.linkClicks') }} <span class="has-text-grey is-size-7">({{ windowLabel }})</span>
+                      {{ $t('dashboard.linkClicks') }}
+                      <span class="has-text-grey is-size-7">(last 30 days)</span>
                     </h3>
                     <b-button size="is-small" type="is-light" icon-right="arrow-top-right"
-                      @click="goToAnalytics" title="Open in Campaign Analytics" />
+                      @click="goToAnalytics" :title="`Open in Campaign Analytics (${windowLabel})`" />
                   </div>
                   <br />
                   <chart type="line" v-if="campaignClicks" :data="campaignClicks" />
@@ -421,7 +411,6 @@ export default Vue.extend({
       isChartsLoading: true,
       isCountsLoading: true,
       isFeaturesLoading: true,
-      isMetricsLoading: false,
       campaignViews: null,
       campaignClicks: null,
       counts: {
@@ -435,23 +424,20 @@ export default Vue.extend({
       // Each: { id, name, sent, to_send, last_sent_at, send_rate, stalled, idle }
       health: [],
 
-      // Solomon fork: dashboard-wide date filter. Drives the four
-      // window-aware metric tiles, the Campaign Health "Sent" column, the
-      // Views/Clicks charts, and is passed through as URL query params on
-      // every click-through to a deeper analytics page.
+      // Solomon fork: dashboard-wide date filter. Drives the
+      // "sent in window" line under Messages Sent, the Campaign Health
+      // "Sent (window)" column, and is passed through as URL query params
+      // on every click-through to a deeper analytics page.
       dateRange: {
         preset: 'today',
         from: null,
         to: null,
       },
-      // The four window-aware metric tiles. Each is the sum across all
-      // currently-running campaigns for the chosen window.
-      metrics: {
-        sent: 0,
-        opened: 0,
-        clicked: 0,
-        bounced: 0,
-      },
+      // Sum of sent emails across all running campaigns for the active
+      // window. Surfaced as a sub-line under the existing "Messages Sent"
+      // lifetime counter — wires the existing tile to the date filter
+      // instead of adding a new one.
+      sentInWindow: 0,
     };
   },
 
@@ -495,89 +481,33 @@ export default Vue.extend({
     },
 
     // Refetch every dashboard surface that depends on the date range.
+    // Charts intentionally NOT refreshed here — they use the original
+    // /api/dashboard/charts (lifetime 30-day overview) and stay constant.
+    // Click-through arrows on the chart panels carry the dashboard's
+    // current date range into the deeper /campaigns/analytics view for
+    // operators who want a per-day breakdown of the chosen window.
     refreshWindow() {
-      this.loadMetrics();
-      this.loadCharts();
+      this.loadSentInWindow();
       this.loadHealth();
     },
 
-    // Pull window-bound counters across all running campaigns.
-    loadMetrics() {
-      this.isMetricsLoading = true;
+    // Sum totalSent from per-campaign send-log stats across all running
+    // campaigns for the active window. Drives the "X sent in <window>"
+    // sub-line under the existing Messages Sent tile (no new card).
+    loadSentInWindow() {
       this.$api.getCampaigns({ per_page: 100 }).then((res) => {
         const all = (res && res.results) || [];
         const ids = all.filter((c) => c.status === 'running').map((c) => c.id);
         if (ids.length === 0) {
-          this.metrics = {
-            sent: 0,
-            opened: 0,
-            clicked: 0,
-            bounced: 0,
-          };
-          this.isMetricsLoading = false;
+          this.sentInWindow = 0;
           return;
         }
-        const fromIso = this.rangeIso.from;
-        const toIso = this.rangeIso.to;
-        // Sent: sum totalSent from per-campaign send-log stats.
-        const sentP = Promise.all(ids.map((id) => this.$api
+        Promise.all(ids.map((id) => this.$api
           .getCampaignSendLogStats(id, this.statsParams)
-          .catch(() => null))).then((rows) => rows.reduce((s, r) => s + ((r && r.totalSent) || 0), 0));
-        // Opens / Clicks / Bounces: one call each, summed across campaigns.
-        const params = {
-          id: ids,
-          from: fromIso || undefined,
-          to: toIso || undefined,
-        };
-        const sumCount = (data) => (Array.isArray(data) ? data.reduce((s, d) => s + (d.count || 0), 0) : 0);
-        const opensP = this.$api.getCampaignViewCounts(params).then(sumCount).catch(() => 0);
-        const clicksP = this.$api.getCampaignClickCounts(params).then(sumCount).catch(() => 0);
-        const bouncesP = this.$api.getCampaignBounceCounts(params).then(sumCount).catch(() => 0);
-        Promise.all([sentP, opensP, clicksP, bouncesP]).then(([sent, opened, clicked, bounced]) => {
-          this.metrics = {
-            sent,
-            opened,
-            clicked,
-            bounced,
-          };
-          this.isMetricsLoading = false;
+          .catch(() => null))).then((rows) => {
+          this.sentInWindow = rows.reduce((s, r) => s + ((r && r.totalSent) || 0), 0);
         });
-      }).catch(() => { this.isMetricsLoading = false; });
-    },
-
-    // Re-pull the Views / Clicks charts using the date-aware analytics
-    // endpoints (the legacy /api/dashboard/charts is hardcoded to 30 days).
-    loadCharts() {
-      this.isChartsLoading = true;
-      this.$api.getCampaigns({ per_page: 100 }).then((res) => {
-        const all = (res && res.results) || [];
-        const ids = all.filter((c) => c.status === 'running').map((c) => c.id);
-        if (ids.length === 0) {
-          this.campaignViews = {};
-          this.campaignClicks = {};
-          this.isChartsLoading = false;
-          return;
-        }
-        const params = {
-          id: ids,
-          from: this.rangeIso.from || undefined,
-          to: this.rangeIso.to || undefined,
-        };
-        Promise.all([
-          this.$api.getCampaignViewCounts(params).catch(() => []),
-          this.$api.getCampaignClickCounts(params).catch(() => []),
-        ]).then(([views, clicks]) => {
-          this.campaignViews = this.makeChart((views || []).map((d) => ({
-            date: d.timestamp,
-            count: d.count,
-          })));
-          this.campaignClicks = this.makeChart((clicks || []).map((d) => ({
-            date: d.timestamp,
-            count: d.count,
-          })));
-          this.isChartsLoading = false;
-        });
-      }).catch(() => { this.isChartsLoading = false; });
+      }).catch(() => { this.sentInWindow = 0; });
     },
 
     // Click-through helpers. Both encode the active date range so the
@@ -604,11 +534,22 @@ export default Vue.extend({
 
     fetchData() {
       this.isCountsLoading = true;
+      this.isChartsLoading = true;
 
       // Lifetime aggregates (entity counts, not date-bound).
       this.$api.getDashboardCounts().then((data) => {
         this.counts = data;
         this.isCountsLoading = false;
+      });
+
+      // Charts: original lifetime 30-day overview. NOT date-filter-aware
+      // by design. Operators who want a per-window per-day breakdown click
+      // the arrow on the chart panel to land on /campaigns/analytics with
+      // the dashboard's current date range as URL params.
+      this.$api.getDashboardCharts().then((data) => {
+        this.isChartsLoading = false;
+        this.campaignViews = this.makeChart(data.campaignViews);
+        this.campaignClicks = this.makeChart(data.linkClicks);
       });
 
       this.isFeaturesLoading = true;
@@ -617,8 +558,7 @@ export default Vue.extend({
         this.isFeaturesLoading = false;
       });
 
-      // Date-aware tiles, charts, Campaign Health — all driven by the
-      // current dateRange preset (defaults to 'today' on first load).
+      // Date-aware surfaces (Sent in window line + Campaign Health).
       this.applyPreset(this.dateRange.preset || 'today');
     },
 
@@ -764,35 +704,6 @@ export default Vue.extend({
         case 'custom': return 'Custom';
         default: return 'Window';
       }
-    },
-    // The four metric tiles rendered above the lifetime aggregates.
-    metricTiles() {
-      return [
-        {
-          key: 'sent',
-          label: 'Sent',
-          icon: 'email-fast-outline',
-          value: this.metrics.sent || 0,
-        },
-        {
-          key: 'opened',
-          label: 'Opened',
-          icon: 'email-open-outline',
-          value: this.metrics.opened || 0,
-        },
-        {
-          key: 'clicked',
-          label: 'Clicked',
-          icon: 'cursor-default-click-outline',
-          value: this.metrics.clicked || 0,
-        },
-        {
-          key: 'bounced',
-          label: 'Bounced',
-          icon: 'email-alert-outline',
-          value: this.metrics.bounced || 0,
-        },
-      ];
     },
   },
 
