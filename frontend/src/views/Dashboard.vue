@@ -594,7 +594,12 @@ export default Vue.extend({
       const query = { preset: this.dateRange.preset };
       if (this.rangeIso.from) query.from = this.rangeIso.from;
       if (this.rangeIso.to) query.to = this.rangeIso.to;
-      this.$router.push({ name: 'campaign', params: { id }, query, hash: '#sendlog' });
+      this.$router.push({
+        name: 'campaign',
+        params: { id },
+        query,
+        hash: '#sendlog',
+      });
     },
 
     fetchData() {
