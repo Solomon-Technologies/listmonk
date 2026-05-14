@@ -508,7 +508,12 @@ export default Vue.extend({
         const all = (res && res.results) || [];
         const ids = all.filter((c) => c.status === 'running').map((c) => c.id);
         if (ids.length === 0) {
-          this.metrics = { sent: 0, opened: 0, clicked: 0, bounced: 0 };
+          this.metrics = {
+            sent: 0,
+            opened: 0,
+            clicked: 0,
+            bounced: 0,
+          };
           this.isMetricsLoading = false;
           return;
         }
@@ -519,13 +524,22 @@ export default Vue.extend({
           .getCampaignSendLogStats(id, this.statsParams)
           .catch(() => null))).then((rows) => rows.reduce((s, r) => s + ((r && r.totalSent) || 0), 0));
         // Opens / Clicks / Bounces: one call each, summed across campaigns.
-        const params = { id: ids, from: fromIso || undefined, to: toIso || undefined };
+        const params = {
+          id: ids,
+          from: fromIso || undefined,
+          to: toIso || undefined,
+        };
         const sumCount = (data) => (Array.isArray(data) ? data.reduce((s, d) => s + (d.count || 0), 0) : 0);
         const opensP = this.$api.getCampaignViewCounts(params).then(sumCount).catch(() => 0);
         const clicksP = this.$api.getCampaignClickCounts(params).then(sumCount).catch(() => 0);
         const bouncesP = this.$api.getCampaignBounceCounts(params).then(sumCount).catch(() => 0);
         Promise.all([sentP, opensP, clicksP, bouncesP]).then(([sent, opened, clicked, bounced]) => {
-          this.metrics = { sent, opened, clicked, bounced };
+          this.metrics = {
+            sent,
+            opened,
+            clicked,
+            bounced,
+          };
           this.isMetricsLoading = false;
         });
       }).catch(() => { this.isMetricsLoading = false; });
@@ -544,13 +558,23 @@ export default Vue.extend({
           this.isChartsLoading = false;
           return;
         }
-        const params = { id: ids, from: this.rangeIso.from || undefined, to: this.rangeIso.to || undefined };
+        const params = {
+          id: ids,
+          from: this.rangeIso.from || undefined,
+          to: this.rangeIso.to || undefined,
+        };
         Promise.all([
           this.$api.getCampaignViewCounts(params).catch(() => []),
           this.$api.getCampaignClickCounts(params).catch(() => []),
         ]).then(([views, clicks]) => {
-          this.campaignViews = this.makeChart((views || []).map((d) => ({ date: d.timestamp, count: d.count })));
-          this.campaignClicks = this.makeChart((clicks || []).map((d) => ({ date: d.timestamp, count: d.count })));
+          this.campaignViews = this.makeChart((views || []).map((d) => ({
+            date: d.timestamp,
+            count: d.count,
+          })));
+          this.campaignClicks = this.makeChart((clicks || []).map((d) => ({
+            date: d.timestamp,
+            count: d.count,
+          })));
           this.isChartsLoading = false;
         });
       }).catch(() => { this.isChartsLoading = false; });
@@ -739,10 +763,30 @@ export default Vue.extend({
     // The four metric tiles rendered above the lifetime aggregates.
     metricTiles() {
       return [
-        { key: 'sent', label: 'Sent', icon: 'email-fast-outline', value: this.metrics.sent || 0 },
-        { key: 'opened', label: 'Opened', icon: 'email-open-outline', value: this.metrics.opened || 0 },
-        { key: 'clicked', label: 'Clicked', icon: 'cursor-default-click-outline', value: this.metrics.clicked || 0 },
-        { key: 'bounced', label: 'Bounced', icon: 'email-alert-outline', value: this.metrics.bounced || 0 },
+        {
+          key: 'sent',
+          label: 'Sent',
+          icon: 'email-fast-outline',
+          value: this.metrics.sent || 0,
+        },
+        {
+          key: 'opened',
+          label: 'Opened',
+          icon: 'email-open-outline',
+          value: this.metrics.opened || 0,
+        },
+        {
+          key: 'clicked',
+          label: 'Clicked',
+          icon: 'cursor-default-click-outline',
+          value: this.metrics.clicked || 0,
+        },
+        {
+          key: 'bounced',
+          label: 'Bounced',
+          icon: 'email-alert-outline',
+          value: this.metrics.bounced || 0,
+        },
       ];
     },
   },
